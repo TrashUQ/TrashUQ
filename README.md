@@ -5,7 +5,7 @@
 1. Copy env file:
 
 ```bash
-cp .env.example .env
+cp backend/.env.example backend/.env
 ```
 
 2. Start stack:
@@ -37,6 +37,13 @@ Expected topics:
 Backend API endpoints:
 - `GET /health`
 - `GET /api/dashboard/bootstrap`
+
+## Runtime data flow
+
+- Arduino clients publish MQTT directly to Mosquitto.
+- Backend subscribes to broker topics (`arduino/+/#`) and persists messages to PostgreSQL.
+- Frontend loads initial state from `GET /api/dashboard/bootstrap` and listens to MQTT for live updates.
+- Federated Learning coordination runs on backend gRPC (`:50051`).
 
 ## Federated Learning over gRPC
 
