@@ -1,12 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   AlertTriangle,
   BarChart3,
   Brain,
-  Camera,
   Download,
   Gauge,
   Layers,
@@ -34,6 +33,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { MqttService, type MqttMessage } from "@/lib/mqtt";
 
 type TabKey =
   | "Overview"
@@ -41,7 +41,6 @@ type TabKey =
   | "Federated Rounds"
   | "Model Performance"
   | "Network & Privacy"
-  | "Image Gallery"
   | "Data Quality"
   | "Model Registry"
   | "Alerts & Logs";
@@ -52,7 +51,6 @@ const navItems: { name: TabKey; icon: React.ComponentType<{ className?: string }
   { name: "Federated Rounds", icon: Timer },
   { name: "Model Performance", icon: Brain },
   { name: "Network & Privacy", icon: Shield },
-  { name: "Image Gallery", icon: Camera },
   { name: "Data Quality", icon: BarChart3 },
   { name: "Model Registry", icon: Layers },
   { name: "Alerts & Logs", icon: AlertTriangle },
@@ -141,15 +139,6 @@ const models = [
   ["v1.0.4", "Round 4", "Acc 86.9%", "F1 0.85"],
 ];
 
-const gallery = [
-  ["Can_001.jpg", "Metal Can", "98%", "ok"],
-  ["Can_042.jpg", "Plastic", "84%", "debug"],
-  ["Can_057.jpg", "Metal Can", "65%", "error"],
-  ["Can_093.jpg", "Plastic", "92%", "ok"],
-  ["Can_117.jpg", "Metal Can", "89%", "ok"],
-  ["Can_141.jpg", "Plastic", "71%", "debug"],
-];
-
 const eventStream = [
   "16:31:18 UNO-Q3 · local epoch done · loss 0.103",
   "16:30:59 UNO-Q2 · local epoch done · loss 0.349",
@@ -193,8 +182,321 @@ const tooltipStyle = {
   color: "#dbeafe",
 };
 
+type DeviceStatus = (typeof devices)[number];
+type DeviceStatusPatch = Partial<DeviceStatus>;
+
+function safeParseJSON(value: string) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+
+function getPayloadText(payload: unknown) {
+  if (typeof payload === "string") return payload;
+  if (payload === null) return "null";
+  return JSON.stringify(payload);
+}
+
+function clampHistory<T>(items: T[], max = 16) {
+  return items.slice(-max);
+}
+
+function toNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number.parseFloat(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function formatPercent(value: unknown): string | null {
+  const numeric = toNumber(value);
+  if (numeric === null) return null;
+  return `${numeric.toFixed(1)}%`;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function clampPercent(value: number): number {
+  if (value < 0) return 0;
+  if (value > 100) return 100;
+  return Math.round(value);
+}
+
+function parseDeviceStatusPatch(payload: unknown): { patch: DeviceStatusPatch; issues: string[] } {
+  if (!isPlainObject(payload)) {
+    return { patch: {}, issues: ["payload is not an object"] };
+  }
+
+  const patch: DeviceStatusPatch = {};
+  const issues: string[] = [];
+
+  if ("cpu" in payload) {
+    const cpu = toNumber(payload.cpu);
+    if (cpu === null) issues.push("cpu must be numeric");
+    else patch.cpu = clampPercent(cpu);
+  }
+
+  if ("ram" in payload) {
+    const ram = toNumber(payload.ram);
+    if (ram === null) issues.push("ram must be numeric");
+    else patch.ram = clampPercent(ram);
+  }
+
+  if ("temp" in payload) {
+    if (typeof payload.temp === "string") patch.temp = payload.temp;
+    else issues.push("temp must be string");
+  }
+
+  if ("heartbeat" in payload) {
+    if (typeof payload.heartbeat === "string") patch.heartbeat = payload.heartbeat;
+    else issues.push("heartbeat must be string");
+  }
+
+  if ("mode" in payload) {
+    if (typeof payload.mode === "string") patch.mode = payload.mode;
+    else issues.push("mode must be string");
+  }
+
+  if ("status" in payload) {
+    if (typeof payload.status === "string") patch.status = payload.status;
+    else issues.push("status must be string");
+  }
+
+  return { patch, issues };
+}
+
+function parseMetricsPatch(payload: unknown): { accuracy?: string; loss?: string; issues: string[] } {
+  if (!isPlainObject(payload)) {
+    return { issues: ["payload is not an object"] };
+  }
+
+  const issues: string[] = [];
+  let accuracy: string | undefined;
+  let loss: string | undefined;
+
+  if ("globalAccuracy" in payload || "global_accuracy" in payload || "accuracy" in payload) {
+    const nextAccuracy = formatPercent(payload.globalAccuracy ?? payload.global_accuracy ?? payload.accuracy);
+    if (nextAccuracy) accuracy = nextAccuracy;
+    else issues.push("globalAccuracy must be numeric");
+  }
+
+  if ("globalLoss" in payload || "global_loss" in payload || "loss" in payload) {
+    const nextLoss = toNumber(payload.globalLoss ?? payload.global_loss ?? payload.loss);
+    if (nextLoss !== null) loss = nextLoss.toFixed(2);
+    else issues.push("globalLoss must be numeric");
+  }
+
+  return { accuracy, loss, issues };
+}
+
+type DashboardDevice = (typeof devices)[number];
+
+interface DashboardBootstrapPayload {
+  devices: DashboardDevice[];
+  metrics: {
+    globalAccuracy: number | null;
+    globalLoss: number | null;
+  };
+  eventStream: string[];
+  classifications: string[];
+  helpRequests: string[];
+}
+
+async function persistMqttMessageToDatabase(message: MqttMessage) {
+  try {
+    await fetch("/api/mqtt/ingest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        topic: message.topic,
+        payload: message.payload,
+        timestamp: message.timestamp,
+      }),
+    });
+  } catch {
+    // Keep UI responsive even if persistence endpoint is unavailable.
+  }
+}
+
+async function loadDashboardBootstrap(): Promise<DashboardBootstrapPayload | null> {
+  try {
+    const response = await fetch("/api/dashboard/bootstrap", { cache: "no-store" });
+    if (!response.ok) return null;
+    const payload = await response.json();
+    if (!payload?.ok || !payload?.data) return null;
+    return payload.data as DashboardBootstrapPayload;
+  } catch {
+    return null;
+  }
+}
+
 export default function Page() {
   const [activeTab, setActiveTab] = useState<TabKey>("Overview");
+  const [devicesState, setDevicesState] = useState(devices);
+  const [eventStreamState, setEventStreamState] = useState(eventStream);
+  const [classificationsState, setClassificationsState] = useState<string[]>([]);
+  const [helpRequestsState, setHelpRequestsState] = useState<string[]>([]);
+  const [globalAccuracy, setGlobalAccuracy] = useState("91.2%");
+  const [globalLoss, setGlobalLoss] = useState("0.32");
+  const [mqttConnected, setMqttConnected] = useState(false);
+  const [lastMqttMessageAt, setLastMqttMessageAt] = useState<number | null>(null);
+  const mqttServiceRef = useRef<MqttService | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const brokerUrl = process.env.NEXT_PUBLIC_MQTT_BROKER_URL ?? "wss://broker.hivemq.com:8000/mqtt";
+    const topicRoot = process.env.NEXT_PUBLIC_MQTT_TOPIC_ROOT ?? "arduino";
+    const username = process.env.NEXT_PUBLIC_MQTT_USERNAME;
+    const password = process.env.NEXT_PUBLIC_MQTT_PASSWORD;
+
+    void loadDashboardBootstrap().then((snapshot) => {
+      if (!isMounted || !snapshot) return;
+
+      if (snapshot.devices.length > 0) {
+        setDevicesState((current) => {
+          const byId = new Map(current.map((device) => [device.id, device]));
+          snapshot.devices.forEach((device) => {
+            byId.set(device.id, device);
+          });
+          return Array.from(byId.values());
+        });
+      }
+
+      if (snapshot.eventStream.length > 0) {
+        setEventStreamState(clampHistory(snapshot.eventStream, 16));
+      }
+
+      if (snapshot.classifications.length > 0) {
+        setClassificationsState(clampHistory(snapshot.classifications, 16));
+      }
+
+      if (snapshot.helpRequests.length > 0) {
+        setHelpRequestsState(clampHistory(snapshot.helpRequests, 16));
+      }
+
+      if (snapshot.metrics.globalAccuracy !== null) {
+        setGlobalAccuracy(`${snapshot.metrics.globalAccuracy.toFixed(1)}%`);
+      }
+
+      if (snapshot.metrics.globalLoss !== null) {
+        setGlobalLoss(snapshot.metrics.globalLoss.toFixed(2));
+      }
+    });
+
+    const mqttService = new MqttService({
+      brokerUrl,
+      topicRoot,
+      username: username && username.length > 0 ? username : undefined,
+      password: password && password.length > 0 ? password : undefined,
+      onConnect: () => {
+        if (!isMounted) return;
+        setMqttConnected(true);
+        setLastMqttMessageAt(Date.now());
+        setEventStreamState((current) => clampHistory([`MQTT connected to ${brokerUrl}`, ...current]));
+      },
+      onError: (error) => {
+        if (!isMounted) return;
+        setMqttConnected(false);
+        setEventStreamState((current) => clampHistory([`MQTT error: ${String(error)}`, ...current]));
+      },
+      onMessage: (message: MqttMessage) => {
+        if (!isMounted) return;
+        void persistMqttMessageToDatabase(message);
+        setLastMqttMessageAt(Date.now());
+        const { topic, payload } = message;
+        const parsedPayload = safeParseJSON(payload);
+        const topicLower = topic.toLowerCase();
+
+        if (topicLower.endsWith("/event")) {
+          setEventStreamState((current) => clampHistory([getPayloadText(parsedPayload), ...current]));
+          return;
+        }
+
+        if (topicLower.endsWith("/status")) {
+          const segments = topic.split("/");
+          const deviceId = segments[segments.length - 2] ?? "unknown";
+          const { patch, issues } = parseDeviceStatusPatch(parsedPayload);
+
+          if (issues.length > 0) {
+            setEventStreamState((current) => clampHistory([`Invalid status payload (${deviceId}): ${issues.join(", ")}`, ...current]));
+          }
+
+          if (Object.keys(patch).length > 0) {
+            setDevicesState((current) => current.map((device) =>
+              device.id === deviceId ? { ...device, ...patch } : device
+            ));
+          } else {
+            setEventStreamState((current) => clampHistory([`Status payload ignored (${deviceId}): no valid fields`, ...current]));
+          }
+          return;
+        }
+
+        if (topicLower.endsWith("/metrics")) {
+          const { accuracy, loss, issues } = parseMetricsPatch(parsedPayload);
+
+          if (issues.length > 0) {
+            setEventStreamState((current) => clampHistory([`Invalid metrics payload: ${issues.join(", ")}`, ...current]));
+          }
+
+          if (accuracy) setGlobalAccuracy(accuracy);
+          if (loss) setGlobalLoss(loss);
+
+          if (!accuracy && !loss) {
+            setEventStreamState((current) => clampHistory([`Metrics payload ignored: no valid fields`, ...current]));
+          }
+          return;
+        }
+
+        if (topicLower.endsWith("/classification")) {
+          setClassificationsState((current) => clampHistory([getPayloadText(parsedPayload), ...current]));
+          return;
+        }
+
+        if (topicLower.endsWith("/help")) {
+          setHelpRequestsState((current) => clampHistory([getPayloadText(parsedPayload), ...current]));
+          return;
+        }
+
+        if (topicLower.endsWith("/logs")) {
+          setEventStreamState((current) => clampHistory([getPayloadText(parsedPayload), ...current]));
+          return;
+        }
+
+        // Log other messages
+        setEventStreamState((current) => clampHistory([`MQTT ${topic}: ${getPayloadText(parsedPayload)}`, ...current]));
+      },
+    });
+
+    mqttServiceRef.current = mqttService;
+    mqttService.connect().catch((error) => {
+      setMqttConnected(false);
+      setEventStreamState((current) => clampHistory([`MQTT startup failed: ${String(error)}`, ...current]));
+    });
+
+    return () => {
+      isMounted = false;
+      setMqttConnected(false);
+      mqttService.disconnect();
+    };
+  }, []);
+
+  const totalDevices = devicesState.length;
+  const onlineDevices = devicesState.filter((device) => device.status === "Online").length;
+  const trainingDevices = devicesState.filter((device) => String(device.mode).toLowerCase() === "training").length;
+  const avgCpuLoad = totalDevices
+    ? Math.round(devicesState.reduce((sum, device) => sum + (typeof device.cpu === "number" ? device.cpu : 0), 0) / totalDevices)
+    : 0;
+  const avgRamLoad = totalDevices
+    ? Math.round(devicesState.reduce((sum, device) => sum + (typeof device.ram === "number" ? device.ram : 0), 0) / totalDevices)
+    : 0;
+  const trainingStateLabel = mqttConnected ? (trainingDevices > 0 ? "Running" : "Idle") : "Disconnected";
+  const lastMessageLabel = lastMqttMessageAt ? new Date(lastMqttMessageAt).toLocaleTimeString() : "--";
 
   const content = useMemo(() => {
     if (activeTab === "Overview") {
@@ -204,25 +506,27 @@ export default function Page() {
             <CardContent className="flex flex-wrap items-center gap-3 p-4 text-sm text-slate-300">
               <span className="text-xl font-semibold text-slate-100">Federated Live</span>
               <span className="text-slate-400">client-server federated learning on Arduino UNO Q</span>
-              <Badge className="bg-yellow-400 text-slate-900">TRAIN</Badge>
-              <span>round <b className="text-amber-300">6</b></span>
-              <span>active clients <b className="text-lime-300">3/3</b></span>
+              <Badge className={mqttConnected ? "bg-lime-400 text-slate-900" : "bg-rose-400 text-slate-900"}>
+                {mqttConnected ? "MQTT ONLINE" : "MQTT OFFLINE"}
+              </Badge>
+              <span>round <b className="text-amber-300">managed by gRPC</b></span>
+              <span>active clients <b className="text-lime-300">{onlineDevices}/{totalDevices}</b></span>
               <span>samples trained <b className="text-orange-300">1,168</b></span>
             </CardContent>
           </Card>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <StatCard title="Active Devices" value="2 / 3" />
-            <StatCard title="Current Round" value="Round 6" />
-            <StatCard title="Global Accuracy" value="91.2%" />
-            <StatCard title="Training State" value="Running" />
+            <StatCard title="Active Devices" value={`${onlineDevices} / ${totalDevices}`} />
+            <StatCard title="Current Round" value="Managed by gRPC" />
+            <StatCard title="Global Accuracy" value={globalAccuracy} />
+            <StatCard title="Training State" value={trainingStateLabel} />
           </div>
 
           <div className="grid gap-3 md:grid-cols-4">
             <div className="rounded-lg border border-slate-700/70 bg-slate-900/50 px-3 py-2 text-sm text-slate-300">Round duration: <span className="text-amber-300">2m 18s</span></div>
-            <div className="rounded-lg border border-slate-700/70 bg-slate-900/50 px-3 py-2 text-sm text-slate-300">Received updates: <span className="text-lime-300">2 / 3</span></div>
-            <div className="rounded-lg border border-slate-700/70 bg-slate-900/50 px-3 py-2 text-sm text-slate-300">Global loss: <span className="text-amber-300">0.32</span></div>
-            <div className="rounded-lg border border-slate-700/70 bg-slate-900/50 px-3 py-2 text-sm text-slate-300">Next round ETA: <span className="text-orange-300">00:41</span></div>
+            <div className="rounded-lg border border-slate-700/70 bg-slate-900/50 px-3 py-2 text-sm text-slate-300">Avg CPU: <span className="text-lime-300">{avgCpuLoad}%</span></div>
+            <div className="rounded-lg border border-slate-700/70 bg-slate-900/50 px-3 py-2 text-sm text-slate-300">Avg RAM: <span className="text-amber-300">{avgRamLoad}%</span></div>
+            <div className="rounded-lg border border-slate-700/70 bg-slate-900/50 px-3 py-2 text-sm text-slate-300">Global loss: <span className="text-orange-300">{globalLoss}</span> · Last MQTT: <span className="text-lime-300">{lastMessageLabel}</span></div>
           </div>
 
           <div className="grid gap-4 xl:grid-cols-2">
@@ -286,7 +590,7 @@ export default function Page() {
                 </div>
               </CardContent>
             </Card>
-            <EventStreamCard />
+            <EventStreamCard eventStream={eventStreamState} />
           </div>
         </div>
       );
@@ -296,9 +600,9 @@ export default function Page() {
       return (
         <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-3">
-            <StatCard title="Online Clients" value="2 / 3" />
-            <StatCard title="Avg CPU Load" value="36.3%" />
-            <StatCard title="Avg RAM Load" value="42.0%" />
+            <StatCard title="Online Clients" value={onlineDevices.toString()} />
+            <StatCard title="Avg CPU Load" value={`${avgCpuLoad}%`} />
+            <StatCard title="Avg RAM Load" value={`${avgRamLoad}%`} />
           </div>
           <div className="grid gap-4 xl:grid-cols-3">
             <Card className="border-slate-800/80 bg-slate-900/60 xl:col-span-2">
@@ -307,7 +611,7 @@ export default function Page() {
                 <CardDescription>Real-time status for each Arduino UNO Q</CardDescription>
               </CardHeader>
               <CardContent className="grid gap-4 xl:grid-cols-2">
-                {devices.map((d) => (
+                {devicesState.map((d) => (
                   <div key={d.id} className="rounded-xl border border-slate-700/70 bg-slate-900/50 p-4">
                     <div className="mb-3 flex items-center justify-between">
                       <p className="font-semibold">{d.id}</p>
@@ -336,15 +640,15 @@ export default function Page() {
                     <PieChart>
                       <Pie
                         data={[
-                          { name: "Healthy", value: 2, color: "#4ade80" },
-                          { name: "Offline", value: 1, color: "#fb7185" },
+                          { name: "Healthy", value: onlineDevices, color: "#4ade80" },
+                          { name: "Offline", value: totalDevices - onlineDevices, color: "#fb7185" },
                         ]}
                         dataKey="value"
                         nameKey="name"
                         outerRadius={70}
                       >
-                        <Cell fill={chartColors.neonGreen} />
-                        <Cell fill={chartColors.rose} />
+                        <Cell fill="#4ade80" />
+                        <Cell fill="#fb7185" />
                       </Pie>
                       <Tooltip contentStyle={tooltipStyle} />
                     </PieChart>
@@ -364,6 +668,7 @@ export default function Page() {
     if (activeTab === "Federated Rounds") {
       return (
         <div className="space-y-4">
+          <GrpcManagedNotice scope="Federated rounds lifecycle, participant counts and aggregation state come from gRPC." />
           <div className="grid gap-4 md:grid-cols-4">
             <StatCard title="Current Round" value="R6" />
             <StatCard title="Participants" value="2 / 3" />
@@ -411,7 +716,7 @@ export default function Page() {
                 ))}
               </CardContent>
             </Card>
-            <EventStreamCard />
+            <EventStreamCard eventStream={eventStreamState} />
           </div>
         </div>
       );
@@ -420,6 +725,7 @@ export default function Page() {
     if (activeTab === "Model Performance") {
       return (
         <div className="space-y-4">
+          <GrpcManagedNotice scope="Model performance curves and confusion snapshots should be sourced from gRPC metrics." />
           <div className="grid gap-4 xl:grid-cols-2">
             <Card className="border-slate-800/80 bg-slate-900/60">
               <CardHeader><CardTitle>Accuracy Evolution</CardTitle></CardHeader>
@@ -492,6 +798,7 @@ export default function Page() {
     if (activeTab === "Network & Privacy") {
       return (
         <div className="space-y-4">
+          <GrpcManagedNotice scope="Federated communication/privacy KPIs should be sourced from gRPC coordinator reports." />
           <div className="grid gap-4 xl:grid-cols-4">
             <StatCard title="Bytes Sent (R6)" value="2.4 MB" />
             <StatCard title="Reduction vs Centralized" value="78%" />
@@ -525,39 +832,6 @@ export default function Page() {
               </CardContent>
             </Card>
           </div>
-        </div>
-      );
-    }
-
-    if (activeTab === "Image Gallery") {
-      return (
-        <div className="grid gap-4 xl:grid-cols-3">
-          <Card className="border-slate-800/80 bg-slate-900/60 xl:col-span-2">
-            <CardHeader>
-              <CardTitle>Image Gallery</CardTitle>
-              <CardDescription>Controlled visual samples, predictions and debug states</CardDescription>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-              {gallery.map((img) => (
-                <div key={img[0]} className="rounded-lg border border-slate-700/70 bg-slate-900/50 p-2 text-xs">
-                  <div className="mb-2 flex h-20 items-center justify-center rounded bg-slate-800">Thumbnail</div>
-                  <p className="font-medium">{img[0]}</p>
-                  <p>Pred: {img[1]}</p>
-                  <p>Confidence: {img[2]}</p>
-                  <Badge variant={img[3] === "ok" ? "success" : img[3] === "debug" ? "warning" : "destructive"}>{img[3]}</Badge>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-          <Card className="border-slate-800/80 bg-slate-900/60">
-            <CardHeader><CardTitle>Gallery Stats</CardTitle></CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <p>Total thumbnails: <span className="text-amber-300">120</span></p>
-              <p>Low confidence (&lt; 80%): <span className="text-amber-300">17</span></p>
-              <p>Misclassified: <span className="text-rose-300">9</span></p>
-              <p>Debug flagged: <span className="text-orange-300">14</span></p>
-            </CardContent>
-          </Card>
         </div>
       );
     }
@@ -653,7 +927,9 @@ export default function Page() {
 
     if (activeTab === "Model Registry") {
       return (
-        <div className="grid gap-4 xl:grid-cols-3">
+        <div className="space-y-4">
+          <GrpcManagedNotice scope="Model versions, deployment status and export metadata should be sourced from gRPC." />
+          <div className="grid gap-4 xl:grid-cols-3">
           <Card className="border-slate-800/80 bg-slate-900/60 xl:col-span-2">
             <CardHeader>
               <CardTitle>Model Registry</CardTitle>
@@ -683,32 +959,80 @@ export default function Page() {
             </CardContent>
           </Card>
         </div>
+        </div>
       );
     }
 
-    return (
-      <div className="grid gap-4 xl:grid-cols-2">
-        <Card className="border-slate-800/80 bg-slate-900/60">
-          <CardHeader>
-            <CardTitle>Alerts & Logs</CardTitle>
-            <CardDescription>Errors, dropped clients, failed uploads and incomplete rounds</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <div className="flex items-center gap-2 rounded-lg border border-rose-700/50 bg-rose-950/35 p-2 text-rose-300">
-              <AlertTriangle className="h-4 w-4" /> UNO-Q4 dropped during Round 6 at 11:21:13
-            </div>
-            <div className="flex items-center gap-2 rounded-lg border border-amber-600/40 bg-amber-950/35 p-2 text-amber-300">
-              <Activity className="h-4 w-4" /> Upload retry triggered for UNO-Q3 weights package
-            </div>
-            <div className="flex items-center gap-2 rounded-lg border border-cyan-700/40 bg-cyan-950/30 p-2 text-amber-300">
-              <Server className="h-4 w-4" /> Aggregation completed with 3/4 participants
-            </div>
-          </CardContent>
-        </Card>
-        <EventStreamCard />
-      </div>
-    );
-  }, [activeTab]);
+    if (activeTab === "Alerts & Logs") {
+      return (
+        <div className="grid gap-4 xl:grid-cols-2">
+          <Card className="border-slate-800/80 bg-slate-900/60">
+            <CardHeader>
+              <CardTitle>Alerts & Logs</CardTitle>
+              <CardDescription>Errors, dropped clients, failed uploads and incomplete rounds</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <div className="flex items-center gap-2 rounded-lg border border-rose-700/50 bg-rose-950/35 p-2 text-rose-300">
+                <AlertTriangle className="h-4 w-4" /> UNO-Q4 dropped during Round 6 at 11:21:13
+              </div>
+              <div className="flex items-center gap-2 rounded-lg border border-amber-600/40 bg-amber-950/35 p-2 text-amber-300">
+                <Activity className="h-4 w-4" /> Upload retry triggered for UNO-Q3 weights package
+              </div>
+              <div className="flex items-center gap-2 rounded-lg border border-cyan-700/40 bg-cyan-950/30 p-2 text-amber-300">
+                <Server className="h-4 w-4" /> Aggregation completed with 3/4 participants
+              </div>
+            </CardContent>
+          </Card>
+          <EventStreamCard eventStream={eventStreamState} />
+          <Card className="border-slate-800/80 bg-slate-900/60">
+            <CardHeader>
+              <CardTitle>Live Classifications</CardTitle>
+              <CardDescription>Latest classification payloads from MQTT topic</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64 space-y-1 overflow-y-auto rounded-md border border-slate-700/70 bg-slate-950/70 p-2 font-mono text-xs text-slate-300">
+                {classificationsState.length === 0 ? (
+                  <p className="py-1 text-slate-500">No classifications received yet.</p>
+                ) : (
+                  classificationsState.map((line, index) => (
+                    <p key={`classification-${index}-${line}`} className="border-b border-slate-800/70 py-1 last:border-0">
+                      {line}
+                    </p>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-slate-800/80 bg-slate-900/60">
+            <CardHeader>
+              <CardTitle>Help Requests</CardTitle>
+              <CardDescription>Latest help/escalation payloads from MQTT topic</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64 space-y-1 overflow-y-auto rounded-md border border-slate-700/70 bg-slate-950/70 p-2 font-mono text-xs text-slate-300">
+                {helpRequestsState.length === 0 ? (
+                  <p className="py-1 text-slate-500">No help requests received yet.</p>
+                ) : (
+                  helpRequestsState.map((line, index) => (
+                    <p
+                      key={`help-${index}-${line}`}
+                      className={`border-b py-1 last:border-0 ${
+                        /urgent|error|critical|sos/i.test(line)
+                          ? "border-rose-700/70 text-rose-300"
+                          : "border-slate-800/70"
+                      }`}
+                    >
+                      {line}
+                    </p>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+  }, [activeTab, avgCpuLoad, avgRamLoad, classificationsState, eventStreamState, globalAccuracy, globalLoss, helpRequestsState, lastMessageLabel, mqttConnected, onlineDevices, totalDevices, trainingStateLabel, devicesState]);
 
   return (
     <main className="min-h-screen bg-[#080b16] text-slate-200">
@@ -769,7 +1093,21 @@ function StatCard({ title, value }: { title: string; value: string }) {
   );
 }
 
-function EventStreamCard() {
+function GrpcManagedNotice({ scope }: { scope: string }) {
+  return (
+    <Card className="border-cyan-800/70 bg-cyan-950/20">
+      <CardContent className="flex items-center justify-between gap-3 p-3 text-sm text-cyan-100">
+        <div>
+          <p className="font-medium text-cyan-200">Managed by gRPC</p>
+          <p className="text-cyan-100/80">{scope}</p>
+        </div>
+        <Badge className="bg-cyan-300/90 text-slate-900">gRPC Source</Badge>
+      </CardContent>
+    </Card>
+  );
+}
+
+function EventStreamCard({ eventStream = [] }: { eventStream?: string[] }) {
   return (
     <Card className="border-slate-800/80 bg-slate-900/60">
       <CardHeader>
@@ -778,8 +1116,8 @@ function EventStreamCard() {
       </CardHeader>
       <CardContent>
         <div className="h-80 space-y-1 overflow-y-auto rounded-md border border-slate-700/70 bg-slate-950/70 p-2 font-mono text-xs text-slate-300">
-          {eventStream.map((line) => (
-            <p key={line} className="border-b border-slate-800/70 py-1 last:border-0">
+          {eventStream.map((line, index) => (
+            <p key={`${index}-${line}`} className="border-b border-slate-800/70 py-1 last:border-0">
               {line}
             </p>
           ))}
