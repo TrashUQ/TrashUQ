@@ -303,25 +303,17 @@ interface DashboardBootstrapPayload {
     globalAccuracy: number | null;
     globalLoss: number | null;
   };
+  federated?: {
+    current_round: number;
+    model_version: number;
+    online_clients: number;
+    pending_updates: number;
+    min_clients_per_round: number;
+    model_size: number;
+  };
   eventStream: string[];
   classifications: string[];
   helpRequests: string[];
-}
-
-async function persistMqttMessageToDatabase(message: MqttMessage) {
-  try {
-    await fetch("/api/mqtt/ingest", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        topic: message.topic,
-        payload: message.payload,
-        timestamp: message.timestamp,
-      }),
-    });
-  } catch {
-    // Keep UI responsive even if persistence endpoint is unavailable.
-  }
 }
 
 async function loadDashboardBootstrap(): Promise<DashboardBootstrapPayload | null> {
@@ -344,6 +336,10 @@ export default function Page() {
   const [helpRequestsState, setHelpRequestsState] = useState<string[]>([]);
   const [globalAccuracy, setGlobalAccuracy] = useState("91.2%");
   const [globalLoss, setGlobalLoss] = useState("0.32");
+  const [federatedRound, setFederatedRound] = useState<number>(1);
+  const [federatedModelVersion, setFederatedModelVersion] = useState<number>(1);
+  const [federatedPendingUpdates, setFederatedPendingUpdates] = useState<number>(0);
+  const [federatedMinClients, setFederatedMinClients] = useState<number>(2);
   const [mqttConnected, setMqttConnected] = useState(false);
   const [lastMqttMessageAt, setLastMqttMessageAt] = useState<number | null>(null);
   const mqttServiceRef = useRef<MqttService | null>(null);
@@ -355,7 +351,7 @@ export default function Page() {
     const username = process.env.NEXT_PUBLIC_MQTT_USERNAME;
     const password = process.env.NEXT_PUBLIC_MQTT_PASSWORD;
 
-    void loadDashboardBootstrap().then((snapshot) => {
+    const applySnapshot = (snapshot: DashboardBootstrapPayload | null) => {
       if (!isMounted || !snapshot) return;
 
       if (snapshot.devices.length > 0) {
@@ -387,7 +383,18 @@ export default function Page() {
       if (snapshot.metrics.globalLoss !== null) {
         setGlobalLoss(snapshot.metrics.globalLoss.toFixed(2));
       }
-    });
+      if (snapshot.federated) {
+        setFederatedRound(snapshot.federated.current_round);
+        setFederatedModelVersion(snapshot.federated.model_version);
+        setFederatedPendingUpdates(snapshot.federated.pending_updates);
+        setFederatedMinClients(snapshot.federated.min_clients_per_round);
+      }
+    };
+
+    void loadDashboardBootstrap().then(applySnapshot);
+    const pollId = setInterval(() => {
+      void loadDashboardBootstrap().then(applySnapshot);
+    }, 4000);
 
     const mqttService = new MqttService({
       brokerUrl,
@@ -407,7 +414,6 @@ export default function Page() {
       },
       onMessage: (message: MqttMessage) => {
         if (!isMounted) return;
-        void persistMqttMessageToDatabase(message);
         setLastMqttMessageAt(Date.now());
         const { topic, payload } = message;
         const parsedPayload = safeParseJSON(payload);
@@ -482,6 +488,7 @@ export default function Page() {
     return () => {
       isMounted = false;
       setMqttConnected(false);
+      clearInterval(pollId);
       mqttService.disconnect();
     };
   }, []);
@@ -509,7 +516,7 @@ export default function Page() {
               <Badge className={mqttConnected ? "bg-lime-400 text-slate-900" : "bg-rose-400 text-slate-900"}>
                 {mqttConnected ? "MQTT ONLINE" : "MQTT OFFLINE"}
               </Badge>
-              <span>round <b className="text-amber-300">managed by gRPC</b></span>
+              <span>round <b className="text-amber-300">R{federatedRound}</b></span>
               <span>active clients <b className="text-lime-300">{onlineDevices}/{totalDevices}</b></span>
               <span>samples trained <b className="text-orange-300">1,168</b></span>
             </CardContent>
@@ -517,13 +524,13 @@ export default function Page() {
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <StatCard title="Active Devices" value={`${onlineDevices} / ${totalDevices}`} />
-            <StatCard title="Current Round" value="Managed by gRPC" />
+            <StatCard title="Current Round" value={`R${federatedRound}`} />
             <StatCard title="Global Accuracy" value={globalAccuracy} />
             <StatCard title="Training State" value={trainingStateLabel} />
           </div>
 
           <div className="grid gap-3 md:grid-cols-4">
-            <div className="rounded-lg border border-slate-700/70 bg-slate-900/50 px-3 py-2 text-sm text-slate-300">Round duration: <span className="text-amber-300">2m 18s</span></div>
+            <div className="rounded-lg border border-slate-700/70 bg-slate-900/50 px-3 py-2 text-sm text-slate-300">Model version: <span className="text-amber-300">v{federatedModelVersion}</span></div>
             <div className="rounded-lg border border-slate-700/70 bg-slate-900/50 px-3 py-2 text-sm text-slate-300">Avg CPU: <span className="text-lime-300">{avgCpuLoad}%</span></div>
             <div className="rounded-lg border border-slate-700/70 bg-slate-900/50 px-3 py-2 text-sm text-slate-300">Avg RAM: <span className="text-amber-300">{avgRamLoad}%</span></div>
             <div className="rounded-lg border border-slate-700/70 bg-slate-900/50 px-3 py-2 text-sm text-slate-300">Global loss: <span className="text-orange-300">{globalLoss}</span> · Last MQTT: <span className="text-lime-300">{lastMessageLabel}</span></div>
@@ -670,8 +677,8 @@ export default function Page() {
         <div className="space-y-4">
           <GrpcManagedNotice scope="Federated rounds lifecycle, participant counts and aggregation state come from gRPC." />
           <div className="grid gap-4 md:grid-cols-4">
-            <StatCard title="Current Round" value="R6" />
-            <StatCard title="Participants" value="2 / 3" />
+            <StatCard title="Current Round" value={`R${federatedRound}`} />
+            <StatCard title="Participants" value={`${federatedPendingUpdates} / ${federatedMinClients}`} />
             <StatCard title="Aggregation" value="FedAvg" />
             <StatCard title="Round Time" value="2m 18s" />
           </div>
@@ -1032,7 +1039,7 @@ export default function Page() {
         </div>
       );
     }
-  }, [activeTab, avgCpuLoad, avgRamLoad, classificationsState, eventStreamState, globalAccuracy, globalLoss, helpRequestsState, lastMessageLabel, mqttConnected, onlineDevices, totalDevices, trainingStateLabel, devicesState]);
+  }, [activeTab, avgCpuLoad, avgRamLoad, classificationsState, eventStreamState, federatedMinClients, federatedModelVersion, federatedPendingUpdates, federatedRound, globalAccuracy, globalLoss, helpRequestsState, lastMessageLabel, mqttConnected, onlineDevices, totalDevices, trainingStateLabel, devicesState]);
 
   return (
     <main className="min-h-screen bg-[#080b16] text-slate-200">
@@ -1043,7 +1050,7 @@ export default function Page() {
           </div>
           <div>
             <p className="text-sm text-slate-400">FL Monitoring</p>
-            <h1 className="text-[2.1rem] font-semibold tracking-tight text-slate-100">FederatedCans</h1>
+            <h1 className="text-[2.1rem] font-semibold tracking-tight text-slate-100">TrashUQ</h1>
           </div>
         </div>
 
@@ -1073,7 +1080,7 @@ export default function Page() {
         <div className="mx-auto max-w-[1600px] space-y-6">
           {content}
           <footer className="rounded-lg border border-slate-800/80 bg-slate-900/40 px-4 py-3 text-xs text-slate-400">
-            <p>© {new Date().getFullYear()} FederatedCans. All rights reserved.</p>
+            <p>© {new Date().getFullYear()} TrashUQ. All rights reserved.</p>
             <p className="mt-1">Federated learning dashboard for Arduino UNO Q recycling intelligence.</p>
           </footer>
         </div>

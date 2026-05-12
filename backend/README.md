@@ -1,11 +1,10 @@
 # Backend (FastAPI + PostgreSQL)
 
-FastAPI service for dashboard bootstrap and MQTT ingestion.
+FastAPI service for dashboard bootstrap, gRPC FL coordinator and direct MQTT broker ingestion.
 
 Endpoints:
 - `GET /health`
 - `GET /api/dashboard/bootstrap`
-- `POST /api/mqtt/ingest`
 
 gRPC service:
 - `FederatedLearningService` on port `50051`
@@ -18,3 +17,7 @@ Federated Learning env vars:
 - `GRPC_PORT` (default: `50051`)
 
 This service is intended to run from the root stack compose file.
+
+MQTT ingestion:
+- Backend subscribes directly to broker topic `${MQTT_TOPIC_ROOT}/+/#`
+- No frontend-to-backend MQTT ingest endpoint is required

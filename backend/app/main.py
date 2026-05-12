@@ -3,24 +3,30 @@ from fastapi import FastAPI, HTTPException
 from app.config import settings
 from app.db import ensure_schema
 from app.grpc_server import GrpcServerRuntime
-from app.schemas import IngestMqttRequest
-from app.service import get_dashboard_bootstrap, ingest_mqtt_message
+from app.mqtt_runtime import MqttIngestRuntime
+from app.service import get_dashboard_bootstrap
 
 app = FastAPI(title="TrashUQ Backend", version="1.0.0")
 grpc_runtime: GrpcServerRuntime | None = None
+mqtt_runtime: MqttIngestRuntime | None = None
 
 
 @app.on_event("startup")
 def startup_event() -> None:
-    global grpc_runtime
+    global grpc_runtime, mqtt_runtime
     ensure_schema()
     grpc_runtime = GrpcServerRuntime(settings.grpc_host, settings.grpc_port)
     grpc_runtime.start()
+    mqtt_runtime = MqttIngestRuntime()
+    mqtt_runtime.start()
 
 
 @app.on_event("shutdown")
 def shutdown_event() -> None:
-    global grpc_runtime
+    global grpc_runtime, mqtt_runtime
+    if mqtt_runtime is not None:
+        mqtt_runtime.stop()
+        mqtt_runtime = None
     if grpc_runtime is not None:
         grpc_runtime.stop()
         grpc_runtime = None
@@ -41,17 +47,3 @@ def dashboard_bootstrap() -> dict:
             detail={"ok": False, "error": "failed to load dashboard bootstrap", "details": str(error)},
         )
 
-
-@app.post("/api/mqtt/ingest")
-def mqtt_ingest(body: IngestMqttRequest) -> dict[str, bool]:
-    if not body.topic or not body.payload:
-        raise HTTPException(status_code=400, detail={"ok": False, "error": "topic and payload are required"})
-
-    try:
-        ingest_mqtt_message(topic=body.topic, payload=body.payload, timestamp=body.timestamp)
-        return {"ok": True}
-    except Exception as error:
-        raise HTTPException(
-            status_code=500,
-            detail={"ok": False, "error": "failed to ingest mqtt message", "details": str(error)},
-        )

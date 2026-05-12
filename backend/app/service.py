@@ -5,6 +5,7 @@ from typing import Any
 from sqlalchemy import text
 
 from app.db import engine
+from app.fl_coordinator import coordinator
 
 
 def clamp_percent(value: float) -> int:
@@ -258,6 +259,7 @@ def get_dashboard_bootstrap() -> dict[str, Any]:
             "globalAccuracy": metrics_row[0] if metrics_row else None,
             "globalLoss": metrics_row[1] if metrics_row else None,
         },
+        "federated": coordinator.snapshot(),
         "eventStream": event_stream,
         "classifications": classifications,
         "helpRequests": help_requests,

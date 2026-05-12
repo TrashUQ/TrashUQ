@@ -96,6 +96,17 @@ class FederatedCoordinator:
         self._round += 1
         self._round_updates.clear()
 
+    def snapshot(self) -> dict[str, int]:
+        with self._lock:
+            return {
+                "current_round": self._round,
+                "model_version": self._model_version,
+                "online_clients": len(self._online_clients),
+                "pending_updates": len(self._round_updates),
+                "min_clients_per_round": self.min_clients,
+                "model_size": self.model_size,
+            }
+
 
 coordinator = FederatedCoordinator(
     model_size=settings.fl_model_size,

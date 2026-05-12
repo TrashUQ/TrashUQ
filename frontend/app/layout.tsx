@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "FederatedCans Dashboard",
-  description: "Hardcoded frontend dashboard for federated learning monitoring",
+  title: "TrashUQ Dashboard",
+  description: "Backend-driven federated learning dashboard for Arduino UNO Q",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

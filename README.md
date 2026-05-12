@@ -37,7 +37,6 @@ Expected topics:
 Backend API endpoints:
 - `GET /health`
 - `GET /api/dashboard/bootstrap`
-- `POST /api/mqtt/ingest`
 
 ## Federated Learning over gRPC
 
