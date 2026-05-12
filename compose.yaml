@@ -1,25 +1,25 @@
 services:
   db:
     image: docker.io/library/postgres:16-alpine
-    container_name: federatedcans-db
+    container_name: trashuq-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-federated}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-federated}
+      POSTGRES_USER: ${POSTGRES_USER:-trashuq}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trashuq}
       POSTGRES_DB: ${POSTGRES_DB:-dashboard}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-federated} -d ${POSTGRES_DB:-dashboard}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-trashuq} -d ${POSTGRES_DB:-dashboard}"]
       interval: 5s
       timeout: 5s
       retries: 20
 
   mqtt:
     image: docker.io/library/eclipse-mosquitto:2
-    container_name: federatedcans-mqtt
+    container_name: trashuq-mqtt
     restart: unless-stopped
     ports:
       - "${MQTT_PORT:-1883}:1883"
@@ -33,14 +33,19 @@ services:
     build:
       context: ./backend
       dockerfile: Containerfile
-    container_name: federatedcans-backend
+    container_name: trashuq-backend
     restart: unless-stopped
     env_file:
       - ./backend/.env
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://federated:federated@db:5432/dashboard}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://trashuq:trashuq@db:5432/dashboard}
+      GRPC_HOST: ${GRPC_HOST:-0.0.0.0}
+      GRPC_PORT: ${GRPC_PORT:-50051}
+      FL_MODEL_SIZE: ${FL_MODEL_SIZE:-16}
+      FL_MIN_CLIENTS_PER_ROUND: ${FL_MIN_CLIENTS_PER_ROUND:-2}
     ports:
       - "${API_PORT:-4000}:4000"
+      - "${GRPC_PORT:-50051}:50051"
     depends_on:
       db:
         condition: service_healthy
@@ -49,7 +54,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Containerfile
-    container_name: federatedcans-frontend
+    container_name: trashuq-frontend
     restart: unless-stopped
     environment:
       BACKEND_API_URL: http://backend:4000

@@ -1,4 +1,4 @@
-# FederatedCans
+# TrashUQ
 
 ## Run all services with Podman
 
@@ -17,6 +17,7 @@ podman compose up --build
 Services:
 - Frontend: `http://localhost:3000`
 - Backend API: `http://localhost:4000`
+- Backend gRPC (FL): `localhost:50051`
 - PostgreSQL: `localhost:5432`
 - MQTT broker: `localhost:1883`
 - MQTT WebSocket: `ws://localhost:9001/mqtt`
@@ -37,3 +38,12 @@ Backend API endpoints:
 - `GET /health`
 - `GET /api/dashboard/bootstrap`
 - `POST /api/mqtt/ingest`
+
+## Federated Learning over gRPC
+
+Proto file: `backend/app/fl.proto`
+
+RPC methods:
+- `Join`
+- `GetGlobalModel`
+- `SubmitUpdate`

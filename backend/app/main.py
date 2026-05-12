@@ -1,15 +1,29 @@
 from fastapi import FastAPI, HTTPException
 
+from app.config import settings
 from app.db import ensure_schema
+from app.grpc_server import GrpcServerRuntime
 from app.schemas import IngestMqttRequest
 from app.service import get_dashboard_bootstrap, ingest_mqtt_message
 
-app = FastAPI(title="FederatedCans Backend", version="1.0.0")
+app = FastAPI(title="TrashUQ Backend", version="1.0.0")
+grpc_runtime: GrpcServerRuntime | None = None
 
 
 @app.on_event("startup")
 def startup_event() -> None:
+    global grpc_runtime
     ensure_schema()
+    grpc_runtime = GrpcServerRuntime(settings.grpc_host, settings.grpc_port)
+    grpc_runtime.start()
+
+
+@app.on_event("shutdown")
+def shutdown_event() -> None:
+    global grpc_runtime
+    if grpc_runtime is not None:
+        grpc_runtime.stop()
+        grpc_runtime = None
 
 
 @app.get("/health")
