@@ -1,0 +1,20 @@
+# Replace placeholders before applying:
+#   {{TOPIC_ROOT}}, {{DASHBOARD_USER}}, {{PUBLISHER_USER}}
+
+# Dashboard user: read-only access to UI topics
+user {{DASHBOARD_USER}}
+topic read {{TOPIC_ROOT}}/+/status
+topic read {{TOPIC_ROOT}}/+/metrics
+topic read {{TOPIC_ROOT}}/+/event
+topic read {{TOPIC_ROOT}}/+/classification
+topic read {{TOPIC_ROOT}}/+/help
+topic read {{TOPIC_ROOT}}/+/logs
+
+# Publisher user: write access for devices/coordinator
+user {{PUBLISHER_USER}}
+topic write {{TOPIC_ROOT}}/+/status
+topic write {{TOPIC_ROOT}}/+/metrics
+topic write {{TOPIC_ROOT}}/+/event
+topic write {{TOPIC_ROOT}}/+/classification
+topic write {{TOPIC_ROOT}}/+/help
+topic write {{TOPIC_ROOT}}/+/logs
