@@ -1,0 +1,71 @@
+services:
+  db:
+    image: docker.io/library/postgres:16-alpine
+    container_name: federatedcans-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-federated}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-federated}
+      POSTGRES_DB: ${POSTGRES_DB:-dashboard}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-federated} -d ${POSTGRES_DB:-dashboard}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  mqtt:
+    image: docker.io/library/eclipse-mosquitto:2
+    container_name: federatedcans-mqtt
+    restart: unless-stopped
+    ports:
+      - "${MQTT_PORT:-1883}:1883"
+      - "${MQTT_WS_PORT:-9001}:9001"
+    volumes:
+      - ./mqtt/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Containerfile
+    container_name: federatedcans-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://federated:federated@db:5432/dashboard}
+    ports:
+      - "${API_PORT:-4000}:4000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Containerfile
+    container_name: federatedcans-frontend
+    restart: unless-stopped
+    environment:
+      BACKEND_API_URL: http://backend:4000
+      NEXT_PUBLIC_MQTT_BROKER_URL: ${NEXT_PUBLIC_MQTT_BROKER_URL:-ws://localhost:9001/mqtt}
+      NEXT_PUBLIC_MQTT_TOPIC_ROOT: ${NEXT_PUBLIC_MQTT_TOPIC_ROOT:-arduino}
+      NEXT_PUBLIC_MQTT_USERNAME: ${NEXT_PUBLIC_MQTT_USERNAME:-}
+      NEXT_PUBLIC_MQTT_PASSWORD: ${NEXT_PUBLIC_MQTT_PASSWORD:-}
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      backend:
+        condition: service_started
+      mqtt:
+        condition: service_started
+
+volumes:
+  postgres_data:
+  mosquitto_data:
+  mosquitto_log:
