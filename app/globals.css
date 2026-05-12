@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 28 18% 12%;
+  --foreground: 42 20% 84%;
+  --card: 30 16% 15%;
+  --card-foreground: 42 20% 84%;
+  --primary: 45 78% 58%;
+  --primary-foreground: 24 28% 14%;
+  --secondary: 28 14% 20%;
+  --secondary-foreground: 42 18% 82%;
+  --muted: 28 12% 18%;
+  --muted-foreground: 40 14% 64%;
+  --accent: 83 36% 52%;
+  --accent-foreground: 30 20% 14%;
+  --border: 30 14% 24%;
+  --input: 30 14% 24%;
+  --ring: 45 78% 58%;
+  --radius: 0.85rem;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  @apply bg-background text-foreground antialiased;
+  font-family: "Manrope", "Sora", "Segoe UI", sans-serif;
+  background-image:
+    radial-gradient(circle at 10% -10%, rgba(250, 189, 47, 0.08), transparent 30%),
+    radial-gradient(circle at 88% -8%, rgba(138, 151, 62, 0.09), transparent 24%),
+    linear-gradient(180deg, rgba(33, 29, 24, 0.99), rgba(28, 25, 21, 0.99));
+  min-height: 100vh;
+}
+
+.chart-grid line {
+  stroke: rgba(148, 163, 184, 0.16);
+}
+
+.chart-axis text {
+  fill: rgba(203, 213, 225, 0.74);
+  font-size: 12px;
+}
