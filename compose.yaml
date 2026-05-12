@@ -25,7 +25,7 @@ services:
       - "${MQTT_PORT:-1883}:1883"
       - "${MQTT_WS_PORT:-9001}:9001"
     volumes:
-      - ./mqtt/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mqtt/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro,z
       - mosquitto_data:/mosquitto/data
       - mosquitto_log:/mosquitto/log
 
@@ -43,7 +43,7 @@ services:
       GRPC_PORT: ${GRPC_PORT:-50051}
       FL_MODEL_SIZE: ${FL_MODEL_SIZE:-16}
       FL_MIN_CLIENTS_PER_ROUND: ${FL_MIN_CLIENTS_PER_ROUND:-2}
-      MQTT_HOST: ${MQTT_HOST:-mqtt}
+      MQTT_HOST: ${MQTT_HOST:-trashuq-mqtt}
       MQTT_PORT: ${MQTT_PORT:-1883}
       MQTT_TOPIC_ROOT: ${MQTT_TOPIC_ROOT:-arduino}
       MQTT_USERNAME: ${MQTT_USERNAME:-}

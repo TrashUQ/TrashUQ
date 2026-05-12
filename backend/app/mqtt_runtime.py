@@ -25,7 +25,8 @@ class MqttIngestRuntime:
         ingest_mqtt_message(topic=message.topic, payload=payload)
 
     def start(self) -> None:
-        self._client.connect(settings.mqtt_host, settings.mqtt_port, 60)
+        # Do not block backend startup if broker DNS/service is not ready yet.
+        self._client.connect_async(settings.mqtt_host, settings.mqtt_port, 60)
         self._client.loop_start()
 
     def stop(self) -> None:
