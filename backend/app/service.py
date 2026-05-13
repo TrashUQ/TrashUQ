@@ -482,3 +482,15 @@ def get_dashboard_bootstrap() -> dict[str, Any]:
         "classifications": classifications,
         "helpRequests": help_requests,
     }
+
+
+def get_fl_state() -> dict[str, Any]:
+    snapshot = coordinator.snapshot()
+    return {
+        "currentRound": snapshot["current_round"],
+        "modelVersion": snapshot["model_version"],
+        "activeClients": snapshot["online_clients"],
+        "pendingUpdates": snapshot["pending_updates"],
+        "minClientsPerRound": snapshot["min_clients_per_round"],
+        "modelSize": snapshot["model_size"],
+    }

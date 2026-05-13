@@ -4,7 +4,7 @@ from app.config import settings
 from app.db import ensure_schema
 from app.grpc_server import GrpcServerRuntime
 from app.mqtt_runtime import MqttIngestRuntime
-from app.service import get_dashboard_bootstrap
+from app.service import get_dashboard_bootstrap, get_fl_state
 
 app = FastAPI(title="TrashUQ Backend", version="1.0.0")
 grpc_runtime: GrpcServerRuntime | None = None
@@ -47,3 +47,7 @@ def dashboard_bootstrap() -> dict:
             detail={"ok": False, "error": "failed to load dashboard bootstrap", "details": str(error)},
         )
 
+
+@app.get("/api/fl/state")
+def fl_state() -> dict:
+    return {"ok": True, "data": get_fl_state()}
