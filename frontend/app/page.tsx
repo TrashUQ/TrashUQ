@@ -56,92 +56,6 @@ const navItems: { name: TabKey; icon: React.ComponentType<{ className?: string }
   { name: "Alerts & Logs", icon: AlertTriangle },
 ];
 
-const accuracyData = [
-  { round: "R1", global: 72, local: 78 },
-  { round: "R2", global: 76, local: 80 },
-  { round: "R3", global: 81, local: 83 },
-  { round: "R4", global: 85, local: 86 },
-  { round: "R5", global: 88, local: 89 },
-  { round: "R6", global: 91, local: 90 },
-];
-
-const lossData = [
-  { round: "R1", loss: 1.8 },
-  { round: "R2", loss: 1.2 },
-  { round: "R3", loss: 0.9 },
-  { round: "R4", loss: 0.65 },
-  { round: "R5", loss: 0.43 },
-  { round: "R6", loss: 0.32 },
-];
-
-const roundTimes = [
-  { round: "R1", seconds: 172 },
-  { round: "R2", seconds: 156 },
-  { round: "R3", seconds: 149 },
-  { round: "R4", seconds: 141 },
-  { round: "R5", seconds: 124 },
-  { round: "R6", seconds: 138 },
-];
-
-const disagreementData = [
-  { round: 84, local: 3.1, fedavg: 0 },
-  { round: 85, local: 4.7, fedavg: 0 },
-  { round: 86, local: 2.6, fedavg: 0 },
-  { round: 87, local: 2.4, fedavg: 0 },
-  { round: 88, local: 4.6, fedavg: 0 },
-  { round: 89, local: 5.2, fedavg: 0 },
-  { round: 90, local: 3.5, fedavg: 0 },
-  { round: 91, local: 3.0, fedavg: 0 },
-  { round: 92, local: 5.1, fedavg: 0 },
-  { round: 93, local: 6.4, fedavg: 0 },
-  { round: 94, local: 4.7, fedavg: 0 },
-  { round: 95, local: 3.9, fedavg: 0 },
-  { round: 96, local: 3.7, fedavg: 0 },
-  { round: 97, local: 4.6, fedavg: 0 },
-];
-
-const samplesPerDevice = [
-  { name: "UNO-Q1", samples: 420 },
-  { name: "UNO-Q2", samples: 389 },
-  { name: "UNO-Q3", samples: 214 },
-];
-
-const classDistribution = [
-  { name: "Plastic", value: 468, color: "#98971a" },
-  { name: "Metal", value: 321, color: "#d79921" },
-  { name: "Paper", value: 187, color: "#458588" },
-  { name: "Glass", value: 121, color: "#d65d0e" },
-  { name: "Organic", value: 74, color: "#ff4fd8" },
-];
-
-const deviceQuality = [
-  { device: "UNO-Q1", clean: 94, noisy: 4, rejected: 2 },
-  { device: "UNO-Q2", clean: 90, noisy: 7, rejected: 3 },
-  { device: "UNO-Q3", clean: 88, noisy: 8, rejected: 4 },
-];
-
-const confusion = [
-  { name: "TP", value: 420, color: "#83a598" },
-  { name: "TN", value: 380, color: "#98971a" },
-  { name: "FP", value: 36, color: "#d79921" },
-  { name: "FN", value: 28, color: "#cc241d" },
-];
-
-const models = [
-  ["v1.0.6", "Round 6", "Acc 91.2%", "F1 0.90"],
-  ["v1.0.5", "Round 5", "Acc 89.4%", "F1 0.88"],
-  ["v1.0.4", "Round 4", "Acc 86.9%", "F1 0.85"],
-];
-
-const communicationTrend = [
-  { round: "R1", mb: 3.9 },
-  { round: "R2", mb: 3.4 },
-  { round: "R3", mb: 3.0 },
-  { round: "R4", mb: 2.8 },
-  { round: "R5", mb: 2.5 },
-  { round: "R6", mb: 2.4 },
-];
-
 const chartColors = {
   mustard: "#d79921",
   olive: "#98971a",
@@ -169,9 +83,32 @@ interface DeviceStatus {
   heartbeat: string;
   mode: string;
   status: string;
+  online?: boolean;
+  modelVersion?: string | null;
+  lastSeen?: string | null;
+  latestClassification?: string | null;
+  latestConfidence?: number | null;
 }
 
 type DeviceStatusPatch = Partial<DeviceStatus>;
+
+interface DashboardMetric {
+  device_id?: string | null;
+  round?: number | null;
+  globalAccuracy?: number | null;
+  globalLoss?: number | null;
+  localLoss?: number | null;
+  localAccuracy?: number | null;
+  samplesTrained?: number | null;
+  drift?: number | null;
+  fps?: number | null;
+  inferenceMs?: number | null;
+  cpu?: number | null;
+  ram?: number | null;
+  mode?: string | null;
+  ts?: string | null;
+  recordedAt?: number | null;
+}
 
 function safeParseJSON(value: string) {
   try {
@@ -216,6 +153,53 @@ function clampPercent(value: number): number {
   return Math.round(value);
 }
 
+function normalizePercentValue(value: unknown): number | null {
+  const numeric = toNumber(value);
+  if (numeric === null) return null;
+  return numeric >= 0 && numeric <= 1 ? numeric * 100 : numeric;
+}
+
+function getString(payload: Record<string, unknown>, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = payload[key];
+    if (typeof value === "string" && value.length > 0) return value;
+  }
+  return null;
+}
+
+function getNumber(payload: Record<string, unknown>, keys: string[]): number | null {
+  for (const key of keys) {
+    const value = toNumber(payload[key]);
+    if (value !== null) return value;
+  }
+  return null;
+}
+
+function formatMetricPercent(value: number | null | undefined): string {
+  return typeof value === "number" && Number.isFinite(value) ? `${value.toFixed(1)}%` : "--";
+}
+
+function formatMetricNumber(value: number | null | undefined, digits = 2): string {
+  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(digits) : "--";
+}
+
+function formatTimestamp(value: string | null | undefined): string {
+  if (!value) return "--";
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) return value;
+  return new Date(parsed).toLocaleTimeString();
+}
+
+function normalizeStatusLabel(value: unknown, online: unknown): string | undefined {
+  if (typeof value === "string" && value.length > 0) {
+    if (value.toLowerCase() === "online") return "Online";
+    if (value.toLowerCase() === "offline") return "Offline";
+    return value;
+  }
+  if (typeof online === "boolean") return online ? "Online" : "Offline";
+  return undefined;
+}
+
 function parseDeviceStatusPatch(payload: unknown): { patch: DeviceStatusPatch; issues: string[] } {
   if (!isPlainObject(payload)) {
     return { patch: {}, issues: ["payload is not an object"] };
@@ -224,21 +208,22 @@ function parseDeviceStatusPatch(payload: unknown): { patch: DeviceStatusPatch; i
   const patch: DeviceStatusPatch = {};
   const issues: string[] = [];
 
-  if ("cpu" in payload) {
-    const cpu = toNumber(payload.cpu);
-    if (cpu === null) issues.push("cpu must be numeric");
-    else patch.cpu = clampPercent(cpu);
+  const cpu = getNumber(payload, ["cpu", "cpu_percent", "avgCpu", "avg_cpu"]);
+  if (cpu !== null) {
+    patch.cpu = clampPercent(cpu);
   }
 
-  if ("ram" in payload) {
-    const ram = toNumber(payload.ram);
-    if (ram === null) issues.push("ram must be numeric");
-    else patch.ram = clampPercent(ram);
+  const ram = getNumber(payload, ["ram", "ram_percent", "avgRam", "avg_ram"]);
+  if (ram !== null) {
+    patch.ram = clampPercent(ram);
   }
 
-  if ("temp" in payload) {
-    if (typeof payload.temp === "string") patch.temp = payload.temp;
-    else issues.push("temp must be string");
+  if ("temp" in payload || "temperature_c" in payload) {
+    const temperature = payload.temp ?? payload.temperature_c;
+    if (typeof temperature === "string") patch.temp = temperature;
+    else if (typeof temperature === "number") patch.temp = `${temperature.toFixed(1)} C`;
+    else if (temperature === null) patch.temp = "-";
+    else issues.push("temp must be string, number, or null");
   }
 
   if ("heartbeat" in payload) {
@@ -246,41 +231,67 @@ function parseDeviceStatusPatch(payload: unknown): { patch: DeviceStatusPatch; i
     else issues.push("heartbeat must be string");
   }
 
-  if ("mode" in payload) {
-    if (typeof payload.mode === "string") patch.mode = payload.mode;
-    else issues.push("mode must be string");
+  const mode = getString(payload, ["mode", "state"]);
+  if (mode) {
+    patch.mode = mode;
   }
 
-  if ("status" in payload) {
-    if (typeof payload.status === "string") patch.status = payload.status;
-    else issues.push("status must be string");
+  const status = normalizeStatusLabel(payload.status, payload.online);
+  if (status) {
+    patch.status = status;
+    patch.online = status === "Online";
+  }
+
+  const modelVersion = getString(payload, ["model_version", "modelVersion"]);
+  if (modelVersion) {
+    patch.modelVersion = modelVersion;
+  }
+
+  const lastSeen = getString(payload, ["ts", "lastSeen"]);
+  if (lastSeen) {
+    patch.lastSeen = lastSeen;
   }
 
   return { patch, issues };
 }
 
-function parseMetricsPatch(payload: unknown): { accuracy?: string; loss?: string; issues: string[] } {
+function parseMetricPayload(payload: unknown, fallbackDeviceId?: string): { metric?: DashboardMetric; issues: string[] } {
   if (!isPlainObject(payload)) {
     return { issues: ["payload is not an object"] };
   }
 
   const issues: string[] = [];
-  let accuracy: string | undefined;
-  let loss: string | undefined;
+  const roundNumber = getNumber(payload, ["round", "currentRound", "current_round"]);
+  const metric: DashboardMetric = {
+    device_id: getString(payload, ["device_id", "client_id"]) ?? fallbackDeviceId ?? null,
+    round: roundNumber !== null ? Math.round(roundNumber) : null,
+    globalAccuracy: normalizePercentValue(payload.globalAccuracy ?? payload.global_accuracy ?? payload.accuracy),
+    globalLoss: getNumber(payload, ["globalLoss", "global_loss", "loss"]),
+    localLoss: getNumber(payload, ["localLoss", "local_loss"]),
+    localAccuracy: normalizePercentValue(payload.localAccuracy ?? payload.local_accuracy),
+    samplesTrained: getNumber(payload, ["samplesTrained", "samples_trained", "num_samples"]),
+    drift: getNumber(payload, ["drift", "clientDrift", "client_drift"]),
+    fps: getNumber(payload, ["fps"]),
+    inferenceMs: getNumber(payload, ["inference_ms", "inferenceMs"]),
+    cpu: getNumber(payload, ["cpu", "cpu_percent", "avgCpu", "avg_cpu"]),
+    ram: getNumber(payload, ["ram", "ram_percent", "avgRam", "avg_ram"]),
+    mode: getString(payload, ["mode"]),
+    ts: getString(payload, ["ts"]),
+    recordedAt: Date.now(),
+  };
 
-  if ("globalAccuracy" in payload || "global_accuracy" in payload || "accuracy" in payload) {
-    const nextAccuracy = formatPercent(payload.globalAccuracy ?? payload.global_accuracy ?? payload.accuracy);
-    if (nextAccuracy) accuracy = nextAccuracy;
-    else issues.push("globalAccuracy must be numeric");
+  if (
+    metric.globalAccuracy === null &&
+    metric.globalLoss === null &&
+    metric.localLoss === null &&
+    metric.drift === null &&
+    metric.cpu === null &&
+    metric.ram === null
+  ) {
+    issues.push("metrics payload has no chartable numeric fields");
   }
 
-  if ("globalLoss" in payload || "global_loss" in payload || "loss" in payload) {
-    const nextLoss = toNumber(payload.globalLoss ?? payload.global_loss ?? payload.loss);
-    if (nextLoss !== null) loss = nextLoss.toFixed(2);
-    else issues.push("globalLoss must be numeric");
-  }
-
-  return { accuracy, loss, issues };
+  return { metric, issues };
 }
 
 type DashboardDevice = DeviceStatus;
@@ -290,6 +301,19 @@ interface DashboardBootstrapPayload {
   metrics: {
     globalAccuracy: number | null;
     globalLoss: number | null;
+  };
+  metricHistory?: DashboardMetric[];
+  fl?: {
+    currentRound: number | null;
+    trainingState: string;
+    globalAccuracy: number | null;
+    globalLoss: number | null;
+    activeClients: number;
+    samplesTrained: number | null;
+    modelVersion: number | null;
+    pendingUpdates: number;
+    minClientsPerRound: number;
+    modelSize: number;
   };
   federated?: {
     current_round: number;
@@ -322,8 +346,10 @@ export default function Page() {
   const [eventStreamState, setEventStreamState] = useState<string[]>([]);
   const [classificationsState, setClassificationsState] = useState<string[]>([]);
   const [helpRequestsState, setHelpRequestsState] = useState<string[]>([]);
+  const [metricHistory, setMetricHistory] = useState<DashboardMetric[]>([]);
   const [globalAccuracy, setGlobalAccuracy] = useState("--");
   const [globalLoss, setGlobalLoss] = useState("--");
+  const [samplesTrained, setSamplesTrained] = useState("--");
   const [federatedRound, setFederatedRound] = useState<number>(1);
   const [federatedModelVersion, setFederatedModelVersion] = useState<number>(1);
   const [federatedPendingUpdates, setFederatedPendingUpdates] = useState<number>(0);
@@ -358,18 +384,34 @@ export default function Page() {
         setHelpRequestsState(clampHistory(snapshot.helpRequests, 16));
       }
 
-      if (snapshot.metrics.globalAccuracy !== null) {
-        setGlobalAccuracy(`${snapshot.metrics.globalAccuracy.toFixed(1)}%`);
+      if (snapshot.metricHistory) {
+        setMetricHistory(snapshot.metricHistory.slice(-100));
       }
 
-      if (snapshot.metrics.globalLoss !== null) {
-        setGlobalLoss(snapshot.metrics.globalLoss.toFixed(2));
+      const latestAccuracy = snapshot.fl?.globalAccuracy ?? snapshot.metrics.globalAccuracy;
+      const latestLoss = snapshot.fl?.globalLoss ?? snapshot.metrics.globalLoss;
+      if (latestAccuracy !== null && latestAccuracy !== undefined) {
+        setGlobalAccuracy(formatMetricPercent(latestAccuracy));
+      }
+
+      if (latestLoss !== null && latestLoss !== undefined) {
+        setGlobalLoss(formatMetricNumber(latestLoss));
+      }
+
+      if (snapshot.fl?.samplesTrained !== null && snapshot.fl?.samplesTrained !== undefined) {
+        setSamplesTrained(String(Math.round(snapshot.fl.samplesTrained)));
       }
       if (snapshot.federated) {
         setFederatedRound(snapshot.federated.current_round);
         setFederatedModelVersion(snapshot.federated.model_version);
         setFederatedPendingUpdates(snapshot.federated.pending_updates);
         setFederatedMinClients(snapshot.federated.min_clients_per_round);
+      }
+      if (snapshot.fl?.currentRound) {
+        setFederatedRound(snapshot.fl.currentRound);
+      }
+      if (snapshot.fl?.modelVersion) {
+        setFederatedModelVersion(snapshot.fl.modelVersion);
       }
     };
 
@@ -442,22 +484,58 @@ export default function Page() {
         }
 
         if (topicLower.endsWith("/metrics")) {
-          const { accuracy, loss, issues } = parseMetricsPatch(parsedPayload);
+          const segments = topic.split("/");
+          const deviceId = segments[segments.length - 2] ?? "unknown";
+          const { metric, issues } = parseMetricPayload(parsedPayload, deviceId);
 
           if (issues.length > 0) {
             setEventStreamState((current) => clampHistory([`Invalid metrics payload: ${issues.join(", ")}`, ...current]));
           }
 
-          if (accuracy) setGlobalAccuracy(accuracy);
-          if (loss) setGlobalLoss(loss);
+          if (metric) {
+            setMetricHistory((current) => clampHistory([...current, metric], 100));
+            if (metric.globalAccuracy !== null && metric.globalAccuracy !== undefined) {
+              setGlobalAccuracy(formatMetricPercent(metric.globalAccuracy));
+            }
+            if (metric.globalLoss !== null && metric.globalLoss !== undefined) {
+              setGlobalLoss(formatMetricNumber(metric.globalLoss));
+            }
+            if (metric.round) {
+              setFederatedRound(metric.round);
+            }
+            if (metric.samplesTrained !== null && metric.samplesTrained !== undefined) {
+              setSamplesTrained(String(Math.round(metric.samplesTrained)));
+            }
+            if (metric.device_id && (metric.cpu !== null || metric.ram !== null || metric.mode)) {
+              setDevicesState((current) => current.map((device) => device.id === metric.device_id ? {
+                ...device,
+                cpu: metric.cpu !== null && metric.cpu !== undefined ? clampPercent(metric.cpu) : device.cpu,
+                ram: metric.ram !== null && metric.ram !== undefined ? clampPercent(metric.ram) : device.ram,
+                mode: metric.mode ?? device.mode,
+                lastSeen: metric.ts ?? device.lastSeen,
+              } : device));
+            }
+          }
 
-          if (!accuracy && !loss) {
+          if (!metric || issues.length > 0) {
             setEventStreamState((current) => clampHistory([`Metrics payload ignored: no valid fields`, ...current]));
           }
           return;
         }
 
         if (topicLower.endsWith("/classification")) {
+          const segments = topic.split("/");
+          const deviceId = segments[segments.length - 2] ?? "unknown";
+          if (isPlainObject(parsedPayload)) {
+            const label = typeof parsedPayload.label === "string" ? parsedPayload.label : null;
+            const confidence = toNumber(parsedPayload.confidence);
+            setDevicesState((current) => current.map((device) => device.id === deviceId ? {
+              ...device,
+              latestClassification: label ?? device.latestClassification,
+              latestConfidence: confidence ?? device.latestConfidence,
+              lastSeen: typeof parsedPayload.ts === "string" ? parsedPayload.ts : device.lastSeen,
+            } : device));
+          }
           setClassificationsState((current) => clampHistory([getPayloadText(parsedPayload), ...current]));
           return;
         }
@@ -493,7 +571,7 @@ export default function Page() {
 
   const totalDevices = devicesState.length;
   const onlineDevices = devicesState.filter((device) => device.status === "Online").length;
-  const trainingDevices = devicesState.filter((device) => String(device.mode).toLowerCase() === "training").length;
+  const trainingDevices = devicesState.filter((device) => ["training", "running", "simulation"].includes(String(device.mode).toLowerCase())).length;
   const avgCpuLoad = totalDevices
     ? Math.round(devicesState.reduce((sum, device) => sum + (typeof device.cpu === "number" ? device.cpu : 0), 0) / totalDevices)
     : 0;
@@ -502,6 +580,43 @@ export default function Page() {
     : 0;
   const trainingStateLabel = mqttConnected ? (trainingDevices > 0 ? "Running" : "Idle") : "Disconnected";
   const lastMessageLabel = lastMqttMessageAt ? new Date(lastMqttMessageAt).toLocaleTimeString() : "--";
+  const latestModelVersion = devicesState.find((device) => device.modelVersion)?.modelVersion ?? `v${federatedModelVersion}`;
+  const lossChartData = metricHistory
+    .filter((metric) => metric.localLoss !== null || metric.globalLoss !== null)
+    .map((metric, index) => ({
+      label: metric.round ? `R${metric.round}` : formatTimestamp(metric.ts) || `#${index + 1}`,
+      localLoss: metric.localLoss,
+      globalLoss: metric.globalLoss,
+      device: metric.device_id ?? "unknown",
+    }));
+  const driftChartData = metricHistory
+    .filter((metric) => metric.drift !== null && metric.drift !== undefined)
+    .map((metric, index) => ({
+      label: metric.round ? `R${metric.round}` : formatTimestamp(metric.ts) || `#${index + 1}`,
+      drift: metric.drift,
+      device: metric.device_id ?? "unknown",
+    }));
+  const accuracyChartData = metricHistory
+    .filter((metric) => metric.globalAccuracy !== null || metric.localAccuracy !== null)
+    .map((metric, index) => ({
+      label: metric.round ? `R${metric.round}` : formatTimestamp(metric.ts) || `#${index + 1}`,
+      globalAccuracy: metric.globalAccuracy,
+      localAccuracy: metric.localAccuracy,
+    }));
+  const roundSummary = Array.from(
+    metricHistory.reduce((byRound, metric) => {
+      if (!metric.round) return byRound;
+      const current = byRound.get(metric.round) ?? { round: metric.round, devices: new Set<string>(), samples: 0 };
+      if (metric.device_id) current.devices.add(metric.device_id);
+      if (metric.samplesTrained) current.samples = Math.max(current.samples, metric.samplesTrained);
+      byRound.set(metric.round, current);
+      return byRound;
+    }, new Map<number, { round: number; devices: Set<string>; samples: number }>())
+  ).map(([, value]) => ({
+    round: value.round,
+    participants: value.devices.size,
+    samples: value.samples,
+  }));
 
   const content = useMemo(() => {
     if (activeTab === "Overview") {
@@ -516,7 +631,7 @@ export default function Page() {
               </Badge>
               <span>round <b className="text-amber-300">R{federatedRound}</b></span>
               <span>active clients <b className="text-lime-300">{onlineDevices}/{totalDevices}</b></span>
-              <span>samples trained <b className="text-orange-300">1,168</b></span>
+              <span>samples trained <b className="text-orange-300">{samplesTrained}</b></span>
             </CardContent>
           </Card>
 
@@ -528,7 +643,7 @@ export default function Page() {
           </div>
 
           <div className="grid gap-3 md:grid-cols-4">
-            <div className="rounded-lg border border-slate-700/70 bg-slate-900/50 px-3 py-2 text-sm text-slate-300">Model version: <span className="text-amber-300">v{federatedModelVersion}</span></div>
+            <div className="rounded-lg border border-slate-700/70 bg-slate-900/50 px-3 py-2 text-sm text-slate-300">Model version: <span className="text-amber-300">{latestModelVersion}</span></div>
             <div className="rounded-lg border border-slate-700/70 bg-slate-900/50 px-3 py-2 text-sm text-slate-300">Avg CPU: <span className="text-lime-300">{avgCpuLoad}%</span></div>
             <div className="rounded-lg border border-slate-700/70 bg-slate-900/50 px-3 py-2 text-sm text-slate-300">Avg RAM: <span className="text-amber-300">{avgRamLoad}%</span></div>
             <div className="rounded-lg border border-slate-700/70 bg-slate-900/50 px-3 py-2 text-sm text-slate-300">Global loss: <span className="text-orange-300">{globalLoss}</span> · Last MQTT: <span className="text-lime-300">{lastMessageLabel}</span></div>
@@ -540,15 +655,20 @@ export default function Page() {
                 <CardTitle>Local Training Loss · Per Client · Per Round</CardTitle>
               </CardHeader>
               <CardContent className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={lossData}>
-                    <CartesianGrid className="chart-grid" strokeDasharray="3 3" />
-                    <XAxis className="chart-axis" dataKey="round" />
-                    <YAxis className="chart-axis" domain={[0, 2]} />
-                    <Tooltip contentStyle={tooltipStyle} />
-                    <Area type="monotone" dataKey="loss" stroke={chartColors.mustard} fill={chartColors.mustard} fillOpacity={0.2} />
-                  </AreaChart>
-                </ResponsiveContainer>
+                {lossChartData.length === 0 ? (
+                  <WaitingState message="Waiting for FL metric data with localLoss/globalLoss." />
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={lossChartData}>
+                      <CartesianGrid className="chart-grid" strokeDasharray="3 3" />
+                      <XAxis className="chart-axis" dataKey="label" />
+                      <YAxis className="chart-axis" />
+                      <Tooltip contentStyle={tooltipStyle} />
+                      <Area type="monotone" dataKey="localLoss" name="Local loss" stroke={chartColors.mustard} fill={chartColors.mustard} fillOpacity={0.2} connectNulls />
+                      <Area type="monotone" dataKey="globalLoss" name="Global loss" stroke={chartColors.cyan} fill={chartColors.cyan} fillOpacity={0.12} connectNulls />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
 
@@ -557,16 +677,19 @@ export default function Page() {
                 <CardTitle>Client Drift vs Aggregated Global Model</CardTitle>
               </CardHeader>
               <CardContent className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={disagreementData}>
-                    <CartesianGrid className="chart-grid" strokeDasharray="3 3" />
-                    <XAxis className="chart-axis" dataKey="round" />
-                    <YAxis className="chart-axis" />
-                    <Tooltip contentStyle={tooltipStyle} />
-                    <Line type="monotone" dataKey="local" stroke={chartColors.orange} strokeWidth={2.5} dot={{ r: 2 }} />
-                    <Line type="monotone" dataKey="fedavg" stroke={chartColors.neonGreen} strokeWidth={2.3} dot={{ r: 2 }} />
-                  </LineChart>
-                </ResponsiveContainer>
+                {driftChartData.length === 0 ? (
+                  <WaitingState message="Waiting for client drift data." />
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={driftChartData}>
+                      <CartesianGrid className="chart-grid" strokeDasharray="3 3" />
+                      <XAxis className="chart-axis" dataKey="label" />
+                      <YAxis className="chart-axis" />
+                      <Tooltip contentStyle={tooltipStyle} />
+                      <Line type="monotone" dataKey="drift" name="Client drift" stroke={chartColors.orange} strokeWidth={2.5} dot={{ r: 2 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -582,12 +705,13 @@ export default function Page() {
                     No real edge devices have reported status yet.
                   </div>
                 ) : devicesState.map((device) => (
-                  <div key={device.id} className="grid grid-cols-5 rounded-md border border-slate-700/70 bg-slate-900/50 px-3 py-2 text-slate-200">
+                  <div key={device.id} className="grid grid-cols-6 rounded-md border border-slate-700/70 bg-slate-900/50 px-3 py-2 text-slate-200">
                     <span className="font-medium">{device.id}</span>
                     <span className={device.status === "Online" ? "text-lime-300" : "text-rose-300"}>{device.status}</span>
                     <span>CPU {device.cpu}%</span>
                     <span>RAM {device.ram}%</span>
                     <span className="text-amber-300">{device.mode}</span>
+                    <span>{device.latestClassification ?? "--"} {device.latestConfidence ? `(${(device.latestConfidence * 100).toFixed(0)}%)` : ""}</span>
                   </div>
                 ))}
               </CardContent>
@@ -631,6 +755,9 @@ export default function Page() {
                       <p>Temp: {d.temp}</p>
                       <p>Heartbeat: {d.heartbeat}</p>
                       <p>Mode: {d.mode}</p>
+                      <p>Latest classification: {d.latestClassification ?? "--"}</p>
+                      <p>Confidence: {d.latestConfidence !== null && d.latestConfidence !== undefined ? `${(d.latestConfidence * 100).toFixed(1)}%` : "--"}</p>
+                      <p>Last update: {formatTimestamp(d.lastSeen)}</p>
                     </div>
                   </div>
                 ))}
@@ -679,47 +806,54 @@ export default function Page() {
             <StatCard title="Current Round" value={`R${federatedRound}`} />
             <StatCard title="Participants" value={`${federatedPendingUpdates} / ${federatedMinClients}`} />
             <StatCard title="Aggregation" value="FedAvg" />
-            <StatCard title="Round Time" value="2m 18s" />
+            <StatCard title="Samples Trained" value={samplesTrained} />
           </div>
           <div className="grid gap-4 xl:grid-cols-2">
           <Card className="border-slate-800/80 bg-slate-900/60">
             <CardHeader>
               <CardTitle>Round Tracker</CardTitle>
-              <CardDescription>Participants, weights, training time and aggregation state</CardDescription>
+              <CardDescription>Rounds observed from real MQTT metric payloads</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
-              <div className="rounded-lg border border-slate-700/70 bg-slate-900/50 p-3">Round 6: 2/3 clients, 2 weights, 2m 18s, FedAvg done</div>
-              <div className="rounded-lg border border-slate-700/70 bg-slate-900/50 p-3">Round 5: 3/3 clients, 3 weights, 2m 04s, FedAvg done</div>
-              <div className="rounded-lg border border-slate-700/70 bg-slate-900/50 p-3">Round 4: 3/3 clients, 3 weights, 2m 21s, FedAvg done</div>
+              {roundSummary.length === 0 ? (
+                <WaitingState message="Waiting for metric payloads with round/sample fields." compact />
+              ) : roundSummary.map((round) => (
+                <div key={round.round} className="rounded-lg border border-slate-700/70 bg-slate-900/50 p-3">
+                  Round {round.round}: {round.participants} participant{round.participants === 1 ? "" : "s"} · samples {round.samples || "--"}
+                </div>
+              ))}
             </CardContent>
           </Card>
           <Card className="border-slate-800/80 bg-slate-900/60">
             <CardHeader>
-              <CardTitle>Training Time by Round</CardTitle>
+              <CardTitle>Loss by Round</CardTitle>
             </CardHeader>
             <CardContent className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={roundTimes}>
-                  <CartesianGrid className="chart-grid" strokeDasharray="3 3" />
-                  <XAxis className="chart-axis" dataKey="round" />
-                  <YAxis className="chart-axis" />
-                  <Tooltip contentStyle={tooltipStyle} />
-                  <Bar dataKey="seconds" fill={chartColors.olive} radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              {lossChartData.length === 0 ? (
+                <WaitingState message="Waiting for real loss metrics." />
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={lossChartData}>
+                    <CartesianGrid className="chart-grid" strokeDasharray="3 3" />
+                    <XAxis className="chart-axis" dataKey="label" />
+                    <YAxis className="chart-axis" />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Bar dataKey="localLoss" name="Local loss" fill={chartColors.olive} radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="globalLoss" name="Global loss" fill={chartColors.cyan} radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
           </div>
           <div className="grid gap-4 xl:grid-cols-3">
             <Card className="border-slate-800/80 bg-slate-900/60 xl:col-span-2">
-              <CardHeader><CardTitle>Round Pipeline Status</CardTitle></CardHeader>
+              <CardHeader><CardTitle>Coordinator State</CardTitle></CardHeader>
               <CardContent className="grid gap-3 md:grid-cols-4 text-sm">
-                {["Local Train", "Upload Weights", "Aggregate", "Broadcast"].map((step, i) => (
-                  <div key={step} className="rounded-lg border border-slate-700/70 bg-slate-900/50 p-3">
-                    <p className="text-slate-200">{step}</p>
-                    <p className={i < 3 ? "text-lime-300" : "text-amber-300"}>{i < 3 ? "Completed" : "In Progress"}</p>
-                  </div>
-                ))}
+                <div className="rounded-lg border border-slate-700/70 bg-slate-900/50 p-3"><p className="text-slate-200">Round</p><p className="text-amber-300">R{federatedRound}</p></div>
+                <div className="rounded-lg border border-slate-700/70 bg-slate-900/50 p-3"><p className="text-slate-200">Pending updates</p><p className="text-amber-300">{federatedPendingUpdates}</p></div>
+                <div className="rounded-lg border border-slate-700/70 bg-slate-900/50 p-3"><p className="text-slate-200">Min clients</p><p className="text-amber-300">{federatedMinClients}</p></div>
+                <div className="rounded-lg border border-slate-700/70 bg-slate-900/50 p-3"><p className="text-slate-200">Model</p><p className="text-amber-300">{latestModelVersion}</p></div>
               </CardContent>
             </Card>
             <EventStreamCard eventStream={eventStreamState} />
@@ -736,64 +870,62 @@ export default function Page() {
             <Card className="border-slate-800/80 bg-slate-900/60">
               <CardHeader><CardTitle>Accuracy Evolution</CardTitle></CardHeader>
               <CardContent className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={accuracyData}>
-                    <CartesianGrid className="chart-grid" strokeDasharray="3 3" />
-                    <XAxis className="chart-axis" dataKey="round" />
-                    <YAxis className="chart-axis" />
-                    <Tooltip contentStyle={tooltipStyle} />
-                    <Area type="monotone" dataKey="global" stroke={chartColors.tealSoft} fill={chartColors.tealSoft} fillOpacity={0.2} />
-                    <Area type="monotone" dataKey="local" stroke={chartColors.mustard} fill={chartColors.mustard} fillOpacity={0.2} />
-                  </AreaChart>
-                </ResponsiveContainer>
+                {accuracyChartData.length === 0 ? (
+                  <WaitingState message="Waiting for accuracy metrics from MQTT." />
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={accuracyChartData}>
+                      <CartesianGrid className="chart-grid" strokeDasharray="3 3" />
+                      <XAxis className="chart-axis" dataKey="label" />
+                      <YAxis className="chart-axis" />
+                      <Tooltip contentStyle={tooltipStyle} />
+                      <Area type="monotone" dataKey="globalAccuracy" name="Global accuracy" stroke={chartColors.tealSoft} fill={chartColors.tealSoft} fillOpacity={0.2} connectNulls />
+                      <Area type="monotone" dataKey="localAccuracy" name="Local accuracy" stroke={chartColors.mustard} fill={chartColors.mustard} fillOpacity={0.2} connectNulls />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
             <Card className="border-slate-800/80 bg-slate-900/60">
               <CardHeader><CardTitle>Loss Trend</CardTitle></CardHeader>
               <CardContent className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={lossData}>
-                    <CartesianGrid className="chart-grid" strokeDasharray="3 3" />
-                    <XAxis className="chart-axis" dataKey="round" />
-                    <YAxis className="chart-axis" />
-                    <Tooltip contentStyle={tooltipStyle} />
-                    <Bar dataKey="loss" fill={chartColors.orange} radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                {lossChartData.length === 0 ? (
+                  <WaitingState message="Waiting for loss metrics from MQTT." />
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={lossChartData}>
+                      <CartesianGrid className="chart-grid" strokeDasharray="3 3" />
+                      <XAxis className="chart-axis" dataKey="label" />
+                      <YAxis className="chart-axis" />
+                      <Tooltip contentStyle={tooltipStyle} />
+                      <Bar dataKey="localLoss" name="Local loss" fill={chartColors.orange} radius={[6, 6, 0, 0]} />
+                      <Bar dataKey="globalLoss" name="Global loss" fill={chartColors.cyan} radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
           </div>
           <div className="grid gap-4 xl:grid-cols-3">
             <Card className="border-slate-800/80 bg-slate-900/60">
-              <CardHeader><CardTitle>F1 Score</CardTitle></CardHeader>
-              <CardContent><Progress value={90} /></CardContent>
+              <CardHeader><CardTitle>Global Accuracy</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                <p className="text-3xl font-semibold text-slate-100">{globalAccuracy}</p>
+                <p className="text-sm text-slate-400">Latest value from MQTT metrics.</p>
+              </CardContent>
             </Card>
             <Card className="border-slate-800/80 bg-slate-900/60 xl:col-span-2">
-              <CardHeader><CardTitle>Confusion Matrix Snapshot</CardTitle></CardHeader>
-              <CardContent className="grid h-64 gap-4 xl:grid-cols-[1fr_220px]">
-                <div className="h-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={confusion} dataKey="value" nameKey="name" outerRadius={88}>
-                        {confusion.map((e) => <Cell key={e.name} fill={e.color} />)}
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="rounded-lg border border-slate-700/70 bg-slate-900/50 p-3 text-sm">
-                  <p className="mb-2 text-xs uppercase tracking-wide text-slate-400">Legend</p>
-                  <div className="space-y-2">
-                    {confusion.map((e) => (
-                      <div key={e.name} className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <span className="h-3 w-3 rounded-full" style={{ backgroundColor: e.color }} />
-                          <span className="text-slate-200">{e.name}</span>
-                        </div>
-                        <span className="text-slate-400">{e.value}</span>
-                      </div>
+              <CardHeader><CardTitle>Classification Stream</CardTitle></CardHeader>
+              <CardContent className="h-64">
+                {classificationsState.length === 0 ? (
+                  <WaitingState message="Waiting for classification payloads." />
+                ) : (
+                  <div className="h-full space-y-1 overflow-y-auto rounded-md border border-slate-700/70 bg-slate-950/70 p-2 font-mono text-xs text-slate-300">
+                    {classificationsState.map((line, index) => (
+                      <p key={`model-classification-${index}-${line}`} className="border-b border-slate-800/70 py-1 last:border-0">{line}</p>
                     ))}
                   </div>
-                </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -805,39 +937,10 @@ export default function Page() {
       return (
         <div className="space-y-4">
           <GrpcManagedNotice scope="Federated communication/privacy KPIs should be sourced from gRPC coordinator reports." />
-          <div className="grid gap-4 xl:grid-cols-4">
-            <StatCard title="Bytes Sent (R6)" value="2.4 MB" />
-            <StatCard title="Reduction vs Centralized" value="78%" />
-            <StatCard title="Weights vs Images" value="1 : 14.6" />
-            <StatCard title="Compression Ratio" value="4.2x" />
-          </div>
-          <div className="grid gap-4 xl:grid-cols-3">
-            <Card className="border-slate-800/80 bg-slate-900/60 xl:col-span-2">
-              <CardHeader><CardTitle>Communication Cost by Round</CardTitle></CardHeader>
-              <CardContent className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={communicationTrend}>
-                    <CartesianGrid className="chart-grid" strokeDasharray="3 3" />
-                    <XAxis className="chart-axis" dataKey="round" />
-                    <YAxis className="chart-axis" />
-                    <Tooltip contentStyle={tooltipStyle} />
-                    <Line type="monotone" dataKey="mb" stroke={chartColors.cyan} strokeWidth={2.5} dot={{ r: 3 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-            <Card className="border-slate-800/80 bg-slate-900/60">
-              <CardHeader><CardTitle>Privacy Mode</CardTitle></CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <Badge variant="warning">Secure Aggregation + Differential Privacy</Badge>
-                <div className="rounded-lg border border-slate-700/70 bg-slate-900/50 p-3">
-                  <p>Noise multiplier: <span className="text-amber-300">0.8</span></p>
-                  <p>Clip norm: <span className="text-amber-300">1.2</span></p>
-                  <p>Epsilon budget: <span className="text-amber-300">3.6</span></p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <UnavailablePanel
+            title="Network & Privacy Metrics"
+            message="No real communication-cost or privacy-budget telemetry is exposed by the backend yet."
+          />
         </div>
       );
     }
@@ -845,88 +948,10 @@ export default function Page() {
     if (activeTab === "Data Quality") {
       return (
         <div className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-4">
-            <StatCard title="Total Labeled Samples" value="1,171" />
-            <StatCard title="Balanced Classes" value="4 / 5" />
-            <StatCard title="Noisy Labels" value="6.4%" />
-            <StatCard title="Rejected Frames" value="2.9%" />
-          </div>
-          <div className="grid gap-4 xl:grid-cols-3">
-            <Card className="border-slate-800/80 bg-slate-900/60 xl:col-span-2">
-              <CardHeader>
-                <CardTitle>Samples per Device</CardTitle>
-                <CardDescription>contribution by each Arduino UNO Q client</CardDescription>
-              </CardHeader>
-              <CardContent className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={samplesPerDevice}>
-                    <CartesianGrid className="chart-grid" strokeDasharray="3 3" />
-                    <XAxis className="chart-axis" dataKey="name" />
-                    <YAxis className="chart-axis" />
-                    <Tooltip contentStyle={tooltipStyle} />
-                    <Bar dataKey="samples" fill={chartColors.olive} radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-            <Card className="border-slate-800/80 bg-slate-900/60 xl:row-span-2">
-              <CardHeader><CardTitle>Label Quality Snapshot</CardTitle></CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <p className="text-slate-300">Consistent labels: <span className="text-lime-300">90.7%</span></p>
-                <p className="text-slate-300">Ambiguous labels: <span className="text-amber-300">6.4%</span></p>
-                <p className="text-slate-300">Rejected samples: <span className="text-orange-300">2.9%</span></p>
-                <div className="rounded-lg border border-slate-700/70 bg-slate-900/50 p-3">
-                  Dataset is healthier now; main gap is `Organic`, which remains underrepresented.
-                </div>
-                <div className="pt-1">
-                  <p className="mb-2 text-xs uppercase tracking-wide text-slate-400">Device Label Audit</p>
-                  <div className="space-y-2">
-                    {deviceQuality.map((d) => (
-                      <div key={d.device} className="rounded-lg border border-slate-700/70 bg-slate-900/50 p-2">
-                        <p className="font-medium text-slate-200">{d.device}</p>
-                        <p>Clean: <span className="text-lime-300">{d.clean}%</span></p>
-                        <p>Noisy: <span className="text-amber-300">{d.noisy}%</span></p>
-                        <p>Rejected: <span className="text-orange-300">{d.rejected}%</span></p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="border-slate-800/80 bg-slate-900/60 xl:col-span-2">
-              <CardHeader>
-                <CardTitle>Class Distribution</CardTitle>
-                <CardDescription>training-set balance across waste categories</CardDescription>
-              </CardHeader>
-              <CardContent className="grid h-72 gap-4 xl:grid-cols-[1fr_220px]">
-                <div className="h-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={classDistribution} dataKey="value" nameKey="name" outerRadius={95}>
-                      {classDistribution.map((c) => (
-                        <Cell key={c.name} fill={c.color} />
-                      ))}
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="rounded-lg border border-slate-700/70 bg-slate-900/50 p-3 text-sm">
-                  <p className="mb-2 text-xs uppercase tracking-wide text-slate-400">Legend</p>
-                  <div className="space-y-2">
-                    {classDistribution.map((c) => (
-                      <div key={c.name} className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <span className="h-3 w-3 rounded-full" style={{ backgroundColor: c.color }} />
-                          <span className="text-slate-200">{c.name}</span>
-                        </div>
-                        <span className="text-slate-400">{c.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <UnavailablePanel
+            title="Data Quality"
+            message="No real labeled-dataset quality metrics are exposed yet. Classification MQTT payloads are available in Alerts & Logs."
+          />
         </div>
       );
     }
@@ -935,36 +960,10 @@ export default function Page() {
       return (
         <div className="space-y-4">
           <GrpcManagedNotice scope="Model versions, deployment status and export metadata should be sourced from gRPC." />
-          <div className="grid gap-4 xl:grid-cols-3">
-          <Card className="border-slate-800/80 bg-slate-900/60 xl:col-span-2">
-            <CardHeader>
-              <CardTitle>Model Registry</CardTitle>
-              <CardDescription>Global model history with version per round and metrics</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              {models.map((m) => (
-                <div key={m[0]} className="flex items-center justify-between rounded-lg border border-slate-700/70 bg-slate-900/50 p-2">
-                  <div>
-                    <p className="font-medium">{m[0]}</p>
-                    <p className="text-muted-foreground">{m[1]} • {m[2]} • {m[3]}</p>
-                  </div>
-                  <button className="flex items-center gap-1 rounded-md border border-slate-600 px-2 py-1 text-xs hover:bg-secondary">
-                    <Download className="h-3.5 w-3.5" /> Download
-                  </button>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-          <Card className="border-slate-800/80 bg-slate-900/60">
-            <CardHeader><CardTitle>Deployment Status</CardTitle></CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <p>Current serving model: <span className="text-amber-300">v1.0.6</span></p>
-              <p>Rollback candidate: <span className="text-slate-300">v1.0.5</span></p>
-              <p>Checksum: <span className="text-lime-300">a8f1...e2b9</span></p>
-              <p>Last export: <span className="text-slate-300">2026-05-06 11:29</span></p>
-            </CardContent>
-          </Card>
-        </div>
+          <UnavailablePanel
+            title="Model Registry"
+            message="The backend exposes the current coordinator model version, but no real model artifact registry is implemented yet."
+          />
         </div>
       );
     }
@@ -978,15 +977,13 @@ export default function Page() {
               <CardDescription>Errors, dropped clients, failed uploads and incomplete rounds</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
-              <div className="flex items-center gap-2 rounded-lg border border-rose-700/50 bg-rose-950/35 p-2 text-rose-300">
-                <AlertTriangle className="h-4 w-4" /> UNO-Q4 dropped during Round 6 at 11:21:13
-              </div>
-              <div className="flex items-center gap-2 rounded-lg border border-amber-600/40 bg-amber-950/35 p-2 text-amber-300">
-                <Activity className="h-4 w-4" /> Upload retry triggered for UNO-Q3 weights package
-              </div>
-              <div className="flex items-center gap-2 rounded-lg border border-cyan-700/40 bg-cyan-950/30 p-2 text-amber-300">
-                <Server className="h-4 w-4" /> Aggregation completed with 3/4 participants
-              </div>
+              {helpRequestsState.length === 0 ? (
+                <WaitingState message="No help or escalation requests have been received." compact />
+              ) : helpRequestsState.map((line, index) => (
+                <div key={`alert-${index}-${line}`} className="flex items-center gap-2 rounded-lg border border-amber-600/40 bg-amber-950/35 p-2 text-amber-300">
+                  <AlertTriangle className="h-4 w-4" /> {line}
+                </div>
+              ))}
             </CardContent>
           </Card>
           <EventStreamCard eventStream={eventStreamState} />
@@ -1038,7 +1035,7 @@ export default function Page() {
         </div>
       );
     }
-  }, [activeTab, avgCpuLoad, avgRamLoad, classificationsState, eventStreamState, federatedMinClients, federatedModelVersion, federatedPendingUpdates, federatedRound, globalAccuracy, globalLoss, helpRequestsState, lastMessageLabel, mqttConnected, onlineDevices, totalDevices, trainingStateLabel, devicesState]);
+  }, [accuracyChartData, activeTab, avgCpuLoad, avgRamLoad, classificationsState, devicesState, driftChartData, eventStreamState, federatedMinClients, federatedModelVersion, federatedPendingUpdates, federatedRound, globalAccuracy, globalLoss, helpRequestsState, lastMessageLabel, latestModelVersion, lossChartData, mqttConnected, onlineDevices, roundSummary, samplesTrained, totalDevices, trainingStateLabel]);
 
   return (
     <main className="min-h-screen bg-[#080b16] text-slate-200">
@@ -1108,6 +1105,28 @@ function GrpcManagedNotice({ scope }: { scope: string }) {
           <p className="text-cyan-100/80">{scope}</p>
         </div>
         <Badge className="bg-cyan-300/90 text-slate-900">gRPC Source</Badge>
+      </CardContent>
+    </Card>
+  );
+}
+
+function WaitingState({ message, compact = false }: { message: string; compact?: boolean }) {
+  return (
+    <div className={`flex h-full items-center justify-center rounded-md border border-slate-700/70 bg-slate-950/50 text-center text-sm text-slate-400 ${compact ? "p-3" : "p-6"}`}>
+      {message}
+    </div>
+  );
+}
+
+function UnavailablePanel({ title, message }: { title: string; message: string }) {
+  return (
+    <Card className="border-slate-800/80 bg-slate-900/60">
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>Real backend source not available yet</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <WaitingState message={message} />
       </CardContent>
     </Card>
   );
