@@ -1,0 +1,16 @@
+flowchart LR
+  user[Browser user] -->|HTTP :3000| frontend[Next.js frontend\ntrashuq-frontend]
+  frontend -->|/api/* proxy\nBACKEND_API_URL=http://backend:4000| backend[FastAPI backend\ntrashuq-backend :4000]
+  frontend -->|MQTT over WebSocket\nws://localhost:9001/mqtt| mqtt[(Mosquitto broker\n:1883 / :9001)]
+
+  edge[Edge node\nsimulator or real runtime] -->|MQTT arduino/<device-id>/...| mqtt
+  mqtt -->|subscribe arduino/+/#| backend
+  backend -->|persist telemetry| db[(PostgreSQL\ntrashuq-db :5432)]
+  backend -->|dashboard bootstrap\n/api/dashboard/bootstrap| frontend
+
+  edge -->|gRPC Join / GetGlobalModel\nlocalhost:50051| fl[FL coordinator\ngRPC service :50051]
+  backend --> fl
+  fl -->|round/model state| backend
+
+  camera[Camera or image/video source] --> model[TFLite classification model\nmodels/trash_classifier.tflite]
+  model --> edge

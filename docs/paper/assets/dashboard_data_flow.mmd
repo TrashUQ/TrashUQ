@@ -1,0 +1,11 @@
+flowchart LR
+  bootstrap["GET /api/dashboard/bootstrap"] --> state["React dashboard state"]
+  websocket["MQTT WebSocket\narduino/+/status metrics event classification help logs"] --> state
+
+  state --> cards["Cards\nActive Devices, Round, Accuracy, Training State"]
+  state --> summary["Live Client Summary\nstatus, CPU, RAM, mode, latest classification"]
+  state --> charts["Charts\nLocal/global loss, accuracy, client drift"]
+  state --> streams["Event Stream\nEvents, logs, help, classifications"]
+
+  db["PostgreSQL mqtt_messages\nstatus/latest metrics/history"] --> bootstrap
+  mqtt["Mosquitto broker"] --> websocket
