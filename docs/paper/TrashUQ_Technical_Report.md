@@ -71,24 +71,7 @@ The implemented operational path is:
 6. The dashboard renders bootstrap data and applies live MQTT WebSocket updates.
 7. The edge client can contact the gRPC FL coordinator for `Join` and `GetGlobalModel`.
 
-```mermaid
-flowchart LR
-  user[Browser user] -->|HTTP :3000| frontend[Next.js frontend\ntrashuq-frontend]
-  frontend -->|/api/* proxy\nBACKEND_API_URL=http://backend:4000| backend[FastAPI backend\ntrashuq-backend :4000]
-  frontend -->|MQTT over WebSocket\nws://localhost:9001/mqtt| mqtt[(Mosquitto broker\n:1883 / :9001)]
-
-  edge[Edge node\nsimulator or real runtime] -->|MQTT arduino/<device-id>/...| mqtt
-  mqtt -->|subscribe arduino/+/#| backend
-  backend -->|persist telemetry| db[(PostgreSQL\ntrashuq-db :5432)]
-  backend -->|dashboard bootstrap\n/api/dashboard/bootstrap| frontend
-
-  edge -->|gRPC Join / GetGlobalModel\nlocalhost:50051| fl[FL coordinator\ngRPC service :50051]
-  backend --> fl
-  fl -->|round/model state| backend
-
-  camera[Camera or image/video source] --> model[TFLite classification model\nmodels/trash_classifier.tflite]
-  model --> edge
-```
+![Full system architecture](assets/architecture.png)
 
 # Hardware and Edge Layer
 
@@ -119,21 +102,7 @@ The model discovered in the repository is TensorFlow Lite. The default labels ar
 
 Multi-device scalability is represented by the topic structure:
 
-```mermaid
-flowchart LR
-  subgraph Nodes["Arduino / Edge nodes"]
-    n1["Arduino Node 01\nstatus metrics classification event logs"]
-    n2["Arduino Node 02\nstatus metrics classification event logs"]
-    n3["Arduino Node 03\nstatus metrics classification event logs"]
-  end
-
-  n1 -->|arduino/node-01/...| broker[(Mosquitto)]
-  n2 -->|arduino/node-02/...| broker
-  n3 -->|arduino/node-03/...| broker
-  broker --> backend[Backend subscriber]
-  backend --> db[(PostgreSQL)]
-  backend --> dashboard[Dashboard]
-```
+![Multi-device edge publishing model](assets/deployment_topology.png)
 
 # MQTT Communication Layer
 
@@ -231,27 +200,7 @@ Log payload:
 }
 ```
 
-```mermaid
-sequenceDiagram
-  autonumber
-  participant Edge as Edge simulator / real runtime
-  participant Broker as Mosquitto MQTT broker
-  participant Backend as FastAPI MQTT subscriber
-  participant DB as PostgreSQL
-  participant API as /api/dashboard/bootstrap
-  participant UI as Next.js dashboard
-
-  Edge->>Broker: PUBLISH arduino/unoq-01/status
-  Edge->>Broker: PUBLISH arduino/unoq-01/metrics
-  Edge->>Broker: PUBLISH arduino/unoq-01/classification
-  Broker-->>Backend: SUB arduino/+/#
-  Backend->>DB: INSERT mqtt_messages(topic, kind, device_id, payload_json, recorded_at)
-  Backend->>DB: UPSERT device_status_latest / INSERT coordinator_metrics
-  UI->>API: GET /api/dashboard/bootstrap
-  API->>DB: Read recent status, metrics, events, classifications
-  API-->>UI: devices, metricHistory, fl state, event streams
-  Broker-->>UI: MQTT WebSocket live update
-```
+![MQTT ingestion flow](assets/mqtt_flow.png)
 
 # Backend Architecture
 
@@ -326,19 +275,7 @@ The main dashboard path does not use mock devices. If real data is unavailable, 
 | Local Training Loss chart | `metricHistory` with `localLoss` / `globalLoss`. |
 | Client Drift chart | `metricHistory` with `drift`. |
 
-```mermaid
-flowchart LR
-  bootstrap["GET /api/dashboard/bootstrap"] --> state["React dashboard state"]
-  websocket["MQTT WebSocket\narduino/+/status metrics event classification help logs"] --> state
-
-  state --> cards["Cards\nActive Devices, Round, Accuracy, Training State"]
-  state --> summary["Live Client Summary\nstatus, CPU, RAM, mode, latest classification"]
-  state --> charts["Charts\nLocal/global loss, accuracy, client drift"]
-  state --> streams["Event Stream\nEvents, logs, help, classifications"]
-
-  db["PostgreSQL mqtt_messages\nstatus/latest metrics/history"] --> bootstrap
-  mqtt["Mosquitto broker"] --> websocket
-```
+![Dashboard data flow](assets/dashboard_data_flow.png)
 
 # Federated Learning Layer
 
@@ -359,27 +296,7 @@ The current coordinator stores state in memory: online clients, current round, m
 | Edge `SubmitUpdate` | Intentionally skipped. |
 | Real local training | Pending. |
 
-```mermaid
-sequenceDiagram
-  autonumber
-  participant Edge as Edge FL client
-  participant FL as Backend gRPC FL coordinator :50051
-  participant State as In-memory FederatedCoordinator
-  participant MQTT as MQTT event/log telemetry
-
-  Edge->>FL: Join(client_id)
-  FL->>State: register online client
-  State-->>FL: round, model_version, global_weights
-  FL-->>Edge: JoinResponse(ok=true)
-
-  Edge->>FL: GetGlobalModel(client_id)
-  FL->>State: read current global model
-  State-->>FL: round, model_version, global_weights
-  FL-->>Edge: GetGlobalModelResponse(ok=true)
-  Edge->>MQTT: event fl_connected
-
-  Note over Edge,FL: SubmitUpdate is intentionally skipped today because the edge repo does not yet produce a real local update payload.
-```
+![Federated Learning gRPC sequence](assets/grpc_fl_sequence.png)
 
 # Edge Simulator and No-Hardware Demo
 
@@ -601,31 +518,7 @@ uv run python scripts/test_model_load.py
 
 # Deployment Topology
 
-```mermaid
-flowchart TB
-  subgraph Host["Developer / demo host"]
-    subgraph Compose["Docker Compose: TrashUQ"]
-      frontend["frontend\nNext.js\n0.0.0.0:3000 -> 3000"]
-      backend["backend\nFastAPI + gRPC\n0.0.0.0:4000 -> 4000\n0.0.0.0:50051 -> 50051"]
-      mqtt["mqtt\nEclipse Mosquitto\n0.0.0.0:1883 -> 1883\n0.0.0.0:9001 -> 9001"]
-      db["db\nPostgreSQL 16\n0.0.0.0:5432 -> 5432"]
-    end
-    edgeLocal["edge repo\nuv run python -m app.edge_simulator\nor app.real_edge_runtime"]
-  end
-
-  external["External edge device\nMQTT_HOST=<SERVER_LAN_IP>\nFL_GRPC_HOST=<SERVER_LAN_IP>"]
-  browser["Browser\nhttp://localhost:3000"]
-
-  browser --> frontend
-  frontend -->|internal HTTP| backend
-  frontend -->|browser WebSocket| mqtt
-  backend --> db
-  backend --> mqtt
-  edgeLocal --> mqtt
-  edgeLocal --> backend
-  external --> mqtt
-  external --> backend
-```
+![Deployment topology](assets/deployment_topology.png)
 
 # Glossary
 

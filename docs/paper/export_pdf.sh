@@ -19,6 +19,7 @@ try_pandoc() {
     "${INPUT}"
     -o "${OUTPUT}"
     --number-sections
+    --resource-path="${SCRIPT_DIR}"
     -V "geometry:margin=1in"
     -V "colorlinks=true"
     -V "linkcolor=blue"
