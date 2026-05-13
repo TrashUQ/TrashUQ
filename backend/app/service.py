@@ -1,5 +1,6 @@
 import json
 import time
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import text
@@ -101,6 +102,116 @@ def parse_metrics_patch(payload: Any) -> dict[str, Any]:
             patch[target] = max(0, round(number)) if target == "online_clients" else number
 
     return patch
+
+
+def normalize_accuracy(value: Any) -> float | None:
+    number = parse_numeric(value)
+    if number is None:
+        return None
+    return number * 100 if 0 <= number <= 1 else number
+
+
+def first_numeric(payload: dict[str, Any], keys: list[str]) -> float | None:
+    for key in keys:
+        number = parse_numeric(payload.get(key))
+        if number is not None:
+            return number
+    return None
+
+
+def first_string(payload: dict[str, Any], keys: list[str]) -> str | None:
+    for key in keys:
+        value = payload.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def recorded_at_iso(recorded_at: int) -> str:
+    return datetime.fromtimestamp(recorded_at / 1000, tz=UTC).isoformat().replace("+00:00", "Z")
+
+
+def normalize_status_payload(device_id: str, payload: Any, recorded_at: int) -> dict[str, Any] | None:
+    if not isinstance(payload, dict):
+        return None
+
+    cpu = first_numeric(payload, ["cpu", "cpu_percent", "avgCpu", "avg_cpu"])
+    ram = first_numeric(payload, ["ram", "ram_percent", "avgRam", "avg_ram"])
+    temperature = payload.get("temp", payload.get("temperature_c"))
+    online = payload.get("online")
+    status = first_string(payload, ["status"])
+    if status is None and isinstance(online, bool):
+        status = "Online" if online else "Offline"
+    elif status is not None:
+        status = "Online" if status.lower() == "online" else "Offline" if status.lower() == "offline" else status
+
+    mode = first_string(payload, ["mode", "state"]) or "Unknown"
+    heartbeat = first_string(payload, ["heartbeat"]) or "No signal"
+    if isinstance(temperature, (int, float)):
+        temp = f"{temperature:.1f} C"
+    elif isinstance(temperature, str) and temperature:
+        temp = temperature
+    else:
+        temp = "-"
+
+    return {
+        "id": device_id,
+        "device_id": device_id,
+        "cpu": clamp_percent(cpu) if cpu is not None else 0,
+        "ram": clamp_percent(ram) if ram is not None else 0,
+        "temp": temp,
+        "temperature_c": parse_numeric(payload.get("temperature_c")),
+        "heartbeat": heartbeat,
+        "mode": mode,
+        "state": first_string(payload, ["state"]) or mode,
+        "status": status or "Unknown",
+        "online": bool(online) if isinstance(online, bool) else status == "Online",
+        "modelVersion": first_string(payload, ["model_version", "modelVersion"]),
+        "lastSeen": payload.get("ts") if isinstance(payload.get("ts"), str) else recorded_at_iso(recorded_at),
+        "recordedAt": recorded_at,
+    }
+
+
+def normalize_metric_payload(device_id: str | None, payload: Any, recorded_at: int) -> dict[str, Any] | None:
+    if not isinstance(payload, dict):
+        return None
+
+    resolved_device_id = first_string(payload, ["device_id", "client_id"]) or device_id
+    round_number = first_numeric(payload, ["round", "currentRound", "current_round"])
+    global_accuracy = normalize_accuracy(payload.get("globalAccuracy", payload.get("global_accuracy", payload.get("accuracy"))))
+
+    return {
+        "device_id": resolved_device_id,
+        "round": round(round_number) if round_number is not None else None,
+        "globalAccuracy": global_accuracy,
+        "globalLoss": first_numeric(payload, ["globalLoss", "global_loss", "loss"]),
+        "localLoss": first_numeric(payload, ["localLoss", "local_loss"]),
+        "localAccuracy": normalize_accuracy(payload.get("localAccuracy", payload.get("local_accuracy"))),
+        "samplesTrained": first_numeric(payload, ["samplesTrained", "samples_trained", "num_samples"]),
+        "drift": first_numeric(payload, ["drift", "clientDrift", "client_drift"]),
+        "fps": first_numeric(payload, ["fps"]),
+        "inferenceMs": first_numeric(payload, ["inference_ms", "inferenceMs"]),
+        "cpu": first_numeric(payload, ["cpu", "cpu_percent", "avgCpu", "avg_cpu"]),
+        "ram": first_numeric(payload, ["ram", "ram_percent", "avgRam", "avg_ram"]),
+        "mode": first_string(payload, ["mode"]),
+        "ts": payload.get("ts") if isinstance(payload.get("ts"), str) else recorded_at_iso(recorded_at),
+        "recordedAt": recorded_at,
+    }
+
+
+def normalize_message(topic: str, kind: str, device_id: str | None, payload_text: str, recorded_at: int) -> dict[str, Any]:
+    parsed = parse_json(payload_text)
+    message = parsed if isinstance(parsed, dict) else {"message": payload_text}
+    resolved_device_id = first_string(message, ["device_id", "client_id"]) if isinstance(message, dict) else None
+    return {
+        "topic": topic,
+        "kind": kind,
+        "device_id": resolved_device_id or device_id,
+        "payload": message,
+        "text": payload_text,
+        "ts": message.get("ts") if isinstance(message, dict) and isinstance(message.get("ts"), str) else recorded_at_iso(recorded_at),
+        "recordedAt": recorded_at,
+    }
 
 
 def ingest_mqtt_message(topic: str, payload: str, timestamp: int | None = None) -> None:
@@ -222,6 +333,21 @@ def get_recent_stream_by_kinds(kinds: list[str], limit: int = 16) -> list[str]:
     return [row[0] for row in rows]
 
 
+def get_recent_messages_by_kinds(kinds: list[str], limit: int = 100) -> list[dict[str, Any]]:
+    query = text(
+        """
+        SELECT topic, kind, device_id, payload_text, recorded_at
+        FROM mqtt_messages
+        WHERE kind = ANY(:kinds)
+        ORDER BY recorded_at DESC, id DESC
+        LIMIT :limit
+        """
+    )
+    with engine.connect() as conn:
+        rows = conn.execute(query, {"kinds": kinds, "limit": limit}).fetchall()
+    return [normalize_message(row[0], row[1], row[2], row[3], row[4]) for row in rows]
+
+
 def get_dashboard_bootstrap() -> dict[str, Any]:
     with engine.connect() as conn:
         devices_rows = conn.execute(
@@ -245,30 +371,113 @@ def get_dashboard_bootstrap() -> dict[str, Any]:
             )
         ).fetchone()
 
+    status_messages = get_recent_messages_by_kinds(["status"], 200)
+    metrics_messages = get_recent_messages_by_kinds(["metrics"], 200)
+    structured_events = get_recent_messages_by_kinds(["event"], 50)
+    structured_logs = get_recent_messages_by_kinds(["logs"], 50)
+    structured_classifications = get_recent_messages_by_kinds(["classification"], 50)
+    structured_help_requests = get_recent_messages_by_kinds(["help"], 50)
+
     event_stream = get_recent_stream_by_kinds(["event", "logs"], 16)
     classifications = get_recent_stream_by_kinds(["classification"], 16)
     help_requests = get_recent_stream_by_kinds(["help"], 16)
 
-    devices = [
-        {
+    devices_by_id: dict[str, dict[str, Any]] = {
+        row[0]: {
             "id": row[0],
+            "device_id": row[0],
             "cpu": row[1] if row[1] is not None else 0,
             "ram": row[2] if row[2] is not None else 0,
             "temp": row[3] if row[3] is not None else "-",
             "heartbeat": row[4] if row[4] is not None else "No signal",
             "mode": row[5] if row[5] is not None else "Unknown",
+            "state": row[5] if row[5] is not None else "Unknown",
             "status": row[6] if row[6] is not None else "Unknown",
+            "online": row[6] == "Online",
+            "modelVersion": None,
+            "lastSeen": None,
+            "recordedAt": None,
         }
         for row in devices_rows
+    }
+
+    for message in reversed(status_messages):
+        device_id = message.get("device_id")
+        normalized = normalize_status_payload(
+            str(device_id) if device_id else "",
+            message.get("payload"),
+            int(message["recordedAt"]),
+        )
+        if normalized and normalized["id"]:
+            devices_by_id[normalized["id"]] = {**devices_by_id.get(normalized["id"], {}), **normalized}
+
+    metric_history = [
+        normalized
+        for normalized in (
+            normalize_metric_payload(message.get("device_id"), message.get("payload"), int(message["recordedAt"]))
+            for message in reversed(metrics_messages)
+        )
+        if normalized is not None
+    ]
+    latest_metric = metric_history[-1] if metric_history else None
+    fl_snapshot = coordinator.snapshot()
+
+    devices = sorted(
+        [
+            {
+                **device,
+                "latestClassification": None,
+                "latestConfidence": None,
+            }
+            for device in devices_by_id.values()
+        ],
+        key=lambda device: device["id"],
+    )
+
+    latest_classification_by_device: dict[str, dict[str, Any]] = {}
+    for message in reversed(structured_classifications):
+        device_id = message.get("device_id")
+        payload = message.get("payload")
+        if isinstance(device_id, str) and isinstance(payload, dict):
+            latest_classification_by_device[device_id] = {
+                "label": payload.get("label"),
+                "confidence": parse_numeric(payload.get("confidence")),
+                "ts": message.get("ts"),
+            }
+
+    devices = [
+        {
+            **device,
+            "latestClassification": latest_classification_by_device.get(device["id"], {}).get("label"),
+            "latestConfidence": latest_classification_by_device.get(device["id"], {}).get("confidence"),
+        }
+        for device in devices
     ]
 
     return {
         "devices": devices,
         "metrics": {
-            "globalAccuracy": metrics_row[0] if metrics_row else None,
-            "globalLoss": metrics_row[1] if metrics_row else None,
+            "globalAccuracy": latest_metric.get("globalAccuracy") if latest_metric and latest_metric.get("globalAccuracy") is not None else metrics_row[0] if metrics_row else None,
+            "globalLoss": latest_metric.get("globalLoss") if latest_metric and latest_metric.get("globalLoss") is not None else metrics_row[1] if metrics_row else None,
         },
-        "federated": coordinator.snapshot(),
+        "metricHistory": metric_history,
+        "events": structured_events,
+        "logs": structured_logs,
+        "classificationEvents": structured_classifications,
+        "helpRequestEvents": structured_help_requests,
+        "fl": {
+            "currentRound": fl_snapshot["current_round"],
+            "trainingState": "running" if any(device.get("online") for device in devices) else "idle",
+            "globalAccuracy": latest_metric.get("globalAccuracy") if latest_metric else None,
+            "globalLoss": latest_metric.get("globalLoss") if latest_metric else None,
+            "activeClients": sum(1 for device in devices if device.get("online")),
+            "samplesTrained": latest_metric.get("samplesTrained") if latest_metric else None,
+            "modelVersion": fl_snapshot["model_version"],
+            "pendingUpdates": fl_snapshot["pending_updates"],
+            "minClientsPerRound": fl_snapshot["min_clients_per_round"],
+            "modelSize": fl_snapshot["model_size"],
+        },
+        "federated": fl_snapshot,
         "eventStream": event_stream,
         "classifications": classifications,
         "helpRequests": help_requests,
