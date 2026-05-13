@@ -18,9 +18,24 @@ def ensure_schema() -> None:
                   kind TEXT NOT NULL,
                   device_id TEXT,
                   payload_text TEXT NOT NULL,
+                  payload TEXT,
                   payload_json JSONB,
-                  recorded_at BIGINT NOT NULL
+                  recorded_at BIGINT NOT NULL,
+                  created_at TIMESTAMPTZ
                 );
+
+                ALTER TABLE mqtt_messages
+                  ADD COLUMN IF NOT EXISTS payload TEXT;
+                ALTER TABLE mqtt_messages
+                  ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ;
+
+                UPDATE mqtt_messages
+                SET payload = payload_text
+                WHERE payload IS NULL;
+
+                UPDATE mqtt_messages
+                SET created_at = to_timestamp(recorded_at / 1000.0)
+                WHERE created_at IS NULL;
 
                 CREATE TABLE IF NOT EXISTS device_status_latest (
                   device_id TEXT PRIMARY KEY,

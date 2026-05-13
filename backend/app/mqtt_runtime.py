@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import logging
+
 import paho.mqtt.client as mqtt
 
 from app.config import settings
 from app.service import ingest_mqtt_message
+
+logger = logging.getLogger(__name__)
 
 
 class MqttIngestRuntime:
@@ -16,13 +20,19 @@ class MqttIngestRuntime:
         self._client.on_message = self._on_message
 
     def _on_connect(self, client: mqtt.Client, _userdata, _flags, reason_code, _properties) -> None:
-        if reason_code != 0:
+        if not (reason_code == 0 or str(reason_code).lower() == "success"):
+            logger.warning("MQTT ingest connection failed: %s", reason_code)
             return
-        client.subscribe(f"{settings.mqtt_topic_root}/+/#")
+        topic = f"{settings.mqtt_topic_root}/+/#"
+        client.subscribe(topic)
+        logger.info("MQTT ingest subscribed to %s", topic)
 
     def _on_message(self, _client: mqtt.Client, _userdata, message: mqtt.MQTTMessage) -> None:
         payload = message.payload.decode("utf-8", errors="replace")
-        ingest_mqtt_message(topic=message.topic, payload=payload)
+        try:
+            ingest_mqtt_message(topic=message.topic, payload=payload)
+        except Exception:
+            logger.exception("Failed to ingest MQTT message on %s", message.topic)
 
     def start(self) -> None:
         # Do not block backend startup if broker DNS/service is not ready yet.

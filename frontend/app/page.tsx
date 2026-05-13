@@ -127,31 +127,10 @@ const confusion = [
   { name: "FN", value: 28, color: "#cc241d" },
 ];
 
-const devices = [
-  { id: "UNO-Q1", cpu: 62, ram: 71, temp: "54°C", heartbeat: "42 ms", mode: "Training", status: "Online" },
-  { id: "UNO-Q2", cpu: 47, ram: 55, temp: "49°C", heartbeat: "39 ms", mode: "Idle", status: "Online" },
-  { id: "UNO-Q3", cpu: 0, ram: 0, temp: "-", heartbeat: "No signal", mode: "Disconnected", status: "Offline" },
-];
-
 const models = [
   ["v1.0.6", "Round 6", "Acc 91.2%", "F1 0.90"],
   ["v1.0.5", "Round 5", "Acc 89.4%", "F1 0.88"],
   ["v1.0.4", "Round 4", "Acc 86.9%", "F1 0.85"],
-];
-
-const eventStream = [
-  "16:31:18 UNO-Q3 · local epoch done · loss 0.103",
-  "16:30:59 UNO-Q2 · local epoch done · loss 0.349",
-  "16:30:16 UNO-Q1 · local epoch done · loss 0.494",
-  "16:30:03 Coordinator · received update from UNO-Q1",
-  "16:29:50 Coordinator · received update from UNO-Q2",
-  "16:29:38 Coordinator · received update from UNO-Q3",
-  "16:29:23 Coordinator · FedAvg aggregation completed",
-  "16:29:13 Coordinator · global model v1.0.6 published",
-  "16:28:57 UNO-Q1 · download global model v1.0.6",
-  "16:28:44 UNO-Q2 · download global model v1.0.6",
-  "16:28:30 UNO-Q3 · download global model v1.0.6",
-  "16:28:16 Round 6 · participants 3/3 · duration 2m18s",
 ];
 
 const communicationTrend = [
@@ -182,7 +161,16 @@ const tooltipStyle = {
   color: "#dbeafe",
 };
 
-type DeviceStatus = (typeof devices)[number];
+interface DeviceStatus {
+  id: string;
+  cpu: number;
+  ram: number;
+  temp: string;
+  heartbeat: string;
+  mode: string;
+  status: string;
+}
+
 type DeviceStatusPatch = Partial<DeviceStatus>;
 
 function safeParseJSON(value: string) {
@@ -295,7 +283,7 @@ function parseMetricsPatch(payload: unknown): { accuracy?: string; loss?: string
   return { accuracy, loss, issues };
 }
 
-type DashboardDevice = (typeof devices)[number];
+type DashboardDevice = DeviceStatus;
 
 interface DashboardBootstrapPayload {
   devices: DashboardDevice[];
@@ -330,12 +318,12 @@ async function loadDashboardBootstrap(): Promise<DashboardBootstrapPayload | nul
 
 export default function Page() {
   const [activeTab, setActiveTab] = useState<TabKey>("Overview");
-  const [devicesState, setDevicesState] = useState(devices);
-  const [eventStreamState, setEventStreamState] = useState(eventStream);
+  const [devicesState, setDevicesState] = useState<DeviceStatus[]>([]);
+  const [eventStreamState, setEventStreamState] = useState<string[]>([]);
   const [classificationsState, setClassificationsState] = useState<string[]>([]);
   const [helpRequestsState, setHelpRequestsState] = useState<string[]>([]);
-  const [globalAccuracy, setGlobalAccuracy] = useState("91.2%");
-  const [globalLoss, setGlobalLoss] = useState("0.32");
+  const [globalAccuracy, setGlobalAccuracy] = useState("--");
+  const [globalLoss, setGlobalLoss] = useState("--");
   const [federatedRound, setFederatedRound] = useState<number>(1);
   const [federatedModelVersion, setFederatedModelVersion] = useState<number>(1);
   const [federatedPendingUpdates, setFederatedPendingUpdates] = useState<number>(0);
@@ -346,7 +334,7 @@ export default function Page() {
 
   useEffect(() => {
     let isMounted = true;
-    const brokerUrl = process.env.NEXT_PUBLIC_MQTT_BROKER_URL ?? "wss://broker.hivemq.com:8000/mqtt";
+    const brokerUrl = process.env.NEXT_PUBLIC_MQTT_BROKER_URL ?? "ws://localhost:9001/mqtt";
     const topicRoot = process.env.NEXT_PUBLIC_MQTT_TOPIC_ROOT ?? "arduino";
     const username = process.env.NEXT_PUBLIC_MQTT_USERNAME;
     const password = process.env.NEXT_PUBLIC_MQTT_PASSWORD;
@@ -355,13 +343,7 @@ export default function Page() {
       if (!isMounted || !snapshot) return;
 
       if (snapshot.devices.length > 0) {
-        setDevicesState((current) => {
-          const byId = new Map(current.map((device) => [device.id, device]));
-          snapshot.devices.forEach((device) => {
-            byId.set(device.id, device);
-          });
-          return Array.from(byId.values());
-        });
+        setDevicesState(snapshot.devices);
       }
 
       if (snapshot.eventStream.length > 0) {
@@ -434,9 +416,25 @@ export default function Page() {
           }
 
           if (Object.keys(patch).length > 0) {
-            setDevicesState((current) => current.map((device) =>
-              device.id === deviceId ? { ...device, ...patch } : device
-            ));
+            setDevicesState((current) => {
+              const existing = current.find((device) => device.id === deviceId);
+              if (existing) {
+                return current.map((device) => device.id === deviceId ? { ...device, ...patch } : device);
+              }
+              return [
+                ...current,
+                {
+                  id: deviceId,
+                  cpu: 0,
+                  ram: 0,
+                  temp: "-",
+                  heartbeat: "No signal",
+                  mode: "Unknown",
+                  status: "Unknown",
+                  ...patch,
+                },
+              ];
+            });
           } else {
             setEventStreamState((current) => clampHistory([`Status payload ignored (${deviceId}): no valid fields`, ...current]));
           }
@@ -576,25 +574,22 @@ export default function Page() {
           <div className="grid gap-4 xl:grid-cols-2">
             <Card className="border-slate-800/80 bg-slate-900/60">
               <CardHeader>
-                <CardTitle>Round 6 Client Summary</CardTitle>
+                <CardTitle>Live Client Summary</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
-                {[
-                  { id: "UNO-Q1", status: "Completed", samples: 420, loss: 0.29, upload: "OK" },
-                  { id: "UNO-Q2", status: "Completed", samples: 389, loss: 0.35, upload: "OK" },
-                  { id: "UNO-Q3", status: "Offline", samples: 0, loss: "-", upload: "Missing" },
-                ].map((row) => (
-                  <div key={row.id} className="grid grid-cols-5 rounded-md border border-slate-700/70 bg-slate-900/50 px-3 py-2 text-slate-200">
-                    <span className="font-medium">{row.id}</span>
-                    <span className={row.status === "Completed" ? "text-lime-300" : "text-rose-300"}>{row.status}</span>
-                    <span>{row.samples} samples</span>
-                    <span>loss {row.loss}</span>
-                    <span className={row.upload === "OK" ? "text-amber-300" : "text-amber-300"}>{row.upload}</span>
+                {devicesState.length === 0 ? (
+                  <div className="rounded-md border border-slate-700/70 bg-slate-900/50 px-3 py-2 text-slate-400">
+                    No real edge devices have reported status yet.
+                  </div>
+                ) : devicesState.map((device) => (
+                  <div key={device.id} className="grid grid-cols-5 rounded-md border border-slate-700/70 bg-slate-900/50 px-3 py-2 text-slate-200">
+                    <span className="font-medium">{device.id}</span>
+                    <span className={device.status === "Online" ? "text-lime-300" : "text-rose-300"}>{device.status}</span>
+                    <span>CPU {device.cpu}%</span>
+                    <span>RAM {device.ram}%</span>
+                    <span className="text-amber-300">{device.mode}</span>
                   </div>
                 ))}
-                <div className="rounded-md border border-slate-700/70 bg-slate-900/50 px-3 py-2 text-xs text-slate-400">
-                  Coordinator note: aggregation executed with 2 client updates due to UNO-Q3 timeout.
-                </div>
               </CardContent>
             </Card>
             <EventStreamCard eventStream={eventStreamState} />
@@ -618,7 +613,11 @@ export default function Page() {
                 <CardDescription>Real-time status for each Arduino UNO Q</CardDescription>
               </CardHeader>
               <CardContent className="grid gap-4 xl:grid-cols-2">
-                {devicesState.map((d) => (
+                {devicesState.length === 0 ? (
+                  <div className="rounded-xl border border-slate-700/70 bg-slate-900/50 p-4 text-sm text-slate-400">
+                    No real edge devices have reported status yet. Run the edge simulator to populate this view.
+                  </div>
+                ) : devicesState.map((d) => (
                   <div key={d.id} className="rounded-xl border border-slate-700/70 bg-slate-900/50 p-4">
                     <div className="mb-3 flex items-center justify-between">
                       <p className="font-semibold">{d.id}</p>
@@ -1123,7 +1122,9 @@ function EventStreamCard({ eventStream = [] }: { eventStream?: string[] }) {
       </CardHeader>
       <CardContent>
         <div className="h-80 space-y-1 overflow-y-auto rounded-md border border-slate-700/70 bg-slate-950/70 p-2 font-mono text-xs text-slate-300">
-          {eventStream.map((line, index) => (
+          {eventStream.length === 0 ? (
+            <p className="py-1 text-slate-500">No real MQTT events or logs have been received yet.</p>
+          ) : eventStream.map((line, index) => (
             <p key={`${index}-${line}`} className="border-b border-slate-800/70 py-1 last:border-0">
               {line}
             </p>

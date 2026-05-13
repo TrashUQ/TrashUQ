@@ -1,6 +1,6 @@
 services:
   db:
-    image: docker.io/library/postgres:16-alpine
+    image: public.ecr.aws/docker/library/postgres:16-alpine
     container_name: trashuq-db
     restart: unless-stopped
     environment:
@@ -12,13 +12,13 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-trashuq} -d ${POSTGRES_DB:-dashboard}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-trashuq} -d ${POSTGRES_DB:-dashboard}" ]
       interval: 5s
       timeout: 5s
       retries: 20
 
   mqtt:
-    image: docker.io/library/eclipse-mosquitto:2
+    image: public.ecr.aws/docker/library/eclipse-mosquitto:2
     container_name: trashuq-mqtt
     restart: unless-stopped
     ports:
@@ -43,7 +43,7 @@ services:
       GRPC_PORT: ${GRPC_PORT:-50051}
       FL_MODEL_SIZE: ${FL_MODEL_SIZE:-16}
       FL_MIN_CLIENTS_PER_ROUND: ${FL_MIN_CLIENTS_PER_ROUND:-2}
-      MQTT_HOST: ${MQTT_HOST:-trashuq-mqtt}
+      MQTT_HOST: ${MQTT_HOST:-mqtt}
       MQTT_PORT: ${MQTT_PORT:-1883}
       MQTT_TOPIC_ROOT: ${MQTT_TOPIC_ROOT:-arduino}
       MQTT_USERNAME: ${MQTT_USERNAME:-}
@@ -54,11 +54,19 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      mqtt:
+        condition: service_started
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Containerfile
+      args:
+        BACKEND_API_URL: http://backend:4000
+        NEXT_PUBLIC_MQTT_BROKER_URL: ${NEXT_PUBLIC_MQTT_BROKER_URL:-ws://localhost:9001/mqtt}
+        NEXT_PUBLIC_MQTT_TOPIC_ROOT: ${NEXT_PUBLIC_MQTT_TOPIC_ROOT:-arduino}
+        NEXT_PUBLIC_MQTT_USERNAME: ${NEXT_PUBLIC_MQTT_USERNAME:-}
+        NEXT_PUBLIC_MQTT_PASSWORD: ${NEXT_PUBLIC_MQTT_PASSWORD:-}
     container_name: trashuq-frontend
     restart: unless-stopped
     environment:

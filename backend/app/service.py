@@ -114,8 +114,17 @@ def ingest_mqtt_message(topic: str, payload: str, timestamp: int | None = None) 
         conn.execute(
             text(
                 """
-                INSERT INTO mqtt_messages(topic, kind, device_id, payload_text, payload_json, recorded_at)
-                VALUES (:topic, :kind, :device_id, :payload_text, CAST(:payload_json AS JSONB), :recorded_at)
+                INSERT INTO mqtt_messages(topic, kind, device_id, payload_text, payload, payload_json, recorded_at, created_at)
+                VALUES (
+                  :topic,
+                  :kind,
+                  :device_id,
+                  :payload_text,
+                  :payload_text,
+                  CAST(:payload_json AS JSONB),
+                  :recorded_at,
+                  to_timestamp(:recorded_at / 1000.0)
+                )
                 """
             ),
             {

@@ -1,14 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  async rewrites() {
-    const backendUrl = process.env.BACKEND_API_URL ?? "http://127.0.0.1:4000";
-    return [
-      {
-        source: "/api/:path*",
-        destination: `${backendUrl}/api/:path*`,
-      },
-    ];
-  },
+  // Backend API proxying is handled by app/api/[...path]/route.ts at request
+  // time, so Docker runtime env is used instead of baking a build-time URL.
 };
 
 export default nextConfig;
