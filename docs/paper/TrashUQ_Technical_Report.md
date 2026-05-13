@@ -1,53 +1,75 @@
-# TrashUQ: Plataforma Edge AI con Aprendizaje Federado para Monitorización Inteligente de Residuos
+---
+lang: en
+header-includes:
+  - \usepackage{graphicx}
+---
 
-**Subtítulo:** Edge AI + Federated Learning trash detection dashboard  
-**Proyecto:** TrashUQ  
-**Repositorios:** `TrashUQ/` y `edge/`  
-**Equipo / autores:** Equipo TrashUQ  
-**Fecha:** 2026-05-14  
-**Versión del informe:** 1.0
+\begin{titlepage}
+\centering
+\vspace*{1.0cm}
+\includegraphics[width=0.36\textwidth]{docs/paper/assets/udl_logo.png}
 
-> **Resumen ejecutivo.** TrashUQ implementa una plataforma edge-to-cloud para monitorizar dispositivos de clasificación de residuos mediante MQTT, persistencia en PostgreSQL, visualización en un dashboard Next.js y coordinación inicial de Federated Learning vía gRPC. El sistema ya demuestra una ruta real de telemetría desde el cliente edge hasta la base de datos y la interfaz. La inferencia real con cámara está preparada mediante un runtime TFLite, mientras que el entrenamiento federado local y `SubmitUpdate` permanecen como trabajo futuro.
+\vspace{2.0cm}
+{\Huge\bfseries TrashUQ\par}
+\vspace{0.45cm}
+{\Large\bfseries An Edge AI and Federated Learning Platform\\for Intelligent Waste Monitoring\par}
+\vspace{1.4cm}
+{\large Technical Report and Demonstration Paper\par}
 
-## Abstract
+\vspace{1.6cm}
+{\large Pol Llinàs\\Bru Pallàs\\Aleix Bertran\\Aleix Rosinach\par}
 
-TrashUQ es una plataforma de monitorización inteligente de residuos basada en Edge AI, MQTT y Federated Learning. Los nodos edge, ya sea mediante el simulador sin hardware o mediante el runtime preparado para cámara/modelo real, publican estado, métricas, clasificaciones, eventos, logs y solicitudes de ayuda en tópicos MQTT bajo `arduino/<device-id>/...`. El backend FastAPI se suscribe a `arduino/+/#`, persiste los mensajes en PostgreSQL y expone un estado agregado mediante `/api/dashboard/bootstrap`. El frontend Next.js consume ese estado inicial, escucha actualizaciones en vivo por MQTT WebSocket y visualiza dispositivos, métricas, historial, clasificaciones y eventos. En paralelo, el backend ejecuta un coordinador gRPC de Federated Learning en `localhost:50051`; actualmente `Join` y `GetGlobalModel` funcionan como smoke test real, mientras que `SubmitUpdate` se omite de forma explícita porque el repositorio edge todavía no produce actualizaciones locales entrenadas.
+\vfill
+{\large Universitat de Lleida\par}
+{\large Repositories: \texttt{TrashUQ/} and \texttt{edge/}\par}
+{\large May 14, 2026\par}
+\end{titlepage}
 
-## Executive Summary
+\newpage
+\tableofcontents
+\newpage
 
-| Capability | Estado | Evidencia |
+> **Executive statement.** TrashUQ demonstrates a real edge-to-cloud telemetry and monitoring pipeline for intelligent waste classification. Edge clients publish MQTT telemetry and classification events, the backend persists the messages in PostgreSQL, the dashboard visualizes live device state and federated-learning metrics, and a gRPC coordinator exposes the initial Federated Learning control path. The no-hardware simulator is not a frontend mock: it publishes real MQTT traffic through the same backend, database, and dashboard path used by real edge devices.
+
+# Abstract {-}
+
+TrashUQ is an Edge AI and Federated Learning platform for intelligent waste monitoring. Edge devices, currently represented by a verified simulator and a prepared real camera/model runtime, publish status, metrics, classifications, events, logs, and help requests over MQTT topics rooted at `arduino/<device-id>/...`. The FastAPI backend subscribes to `arduino/+/#`, persists every MQTT message in PostgreSQL, and exposes a normalized dashboard state through `/api/dashboard/bootstrap`. The Next.js frontend consumes this backend bootstrap state and also subscribes to MQTT over WebSocket for live updates. In parallel, the backend exposes a gRPC Federated Learning coordinator on port `50051`; `Join` and `GetGlobalModel` are implemented and verified, while `SubmitUpdate` is intentionally skipped in the edge smoke test because real local training and update generation are not implemented yet. The real model path is prepared around a TensorFlow Lite classification model, not an object detector.
+
+# Executive Summary {-}
+
+| Capability | Status | Evidence |
 |---|---:|---|
-| MQTT edge telemetry | Implementado | `edge/app/edge_simulator.py` publica en `arduino/<device-id>/...`; `TrashUQ/backend/app/mqtt_runtime.py` se suscribe a `arduino/+/#`. |
-| Backend persistence | Implementado | `mqtt_messages`, `device_status_latest`, `device_status_history` y `coordinator_metrics` en `TrashUQ/backend/app/db.py`. |
-| Dashboard live monitoring | Implementado | `/api/dashboard/bootstrap` + MQTT WebSocket `ws://localhost:9001/mqtt` en `TrashUQ/frontend/app/page.tsx`. |
-| gRPC FL Join/GetGlobalModel | Implementado | `TrashUQ/backend/app/fl.proto`, `grpc_server.py` y `edge/scripts/test_fl_grpc.py`. |
-| Real camera inference | Preparado | `edge/app/model_runner.py`, `camera_runtime.py`, `real_edge_runtime.py`. |
-| SubmitUpdate / local FL training | Pendiente | `edge/scripts/test_fl_grpc.py` lo omite; no existe payload local real de entrenamiento. |
+| MQTT edge telemetry | Implemented | `edge/app/edge_simulator.py` publishes to `arduino/<device-id>/...`; `TrashUQ/backend/app/mqtt_runtime.py` subscribes to `arduino/+/#`. |
+| Backend persistence | Implemented | `mqtt_messages`, `device_status_latest`, `device_status_history`, and `coordinator_metrics` are created in `TrashUQ/backend/app/db.py`. |
+| Dashboard live monitoring | Implemented | `/api/dashboard/bootstrap` plus MQTT WebSocket `ws://localhost:9001/mqtt` in `TrashUQ/frontend/app/page.tsx`. |
+| gRPC FL Join/GetGlobalModel | Implemented | `TrashUQ/backend/app/fl.proto`, `grpc_server.py`, and `edge/scripts/test_fl_grpc.py`. |
+| Real camera inference | Prepared | `edge/app/model_runner.py`, `camera_runtime.py`, and `real_edge_runtime.py`. |
+| SubmitUpdate / local FL training | Pending | The edge smoke test skips `SubmitUpdate`; no real local update payload exists yet. |
 
-## 1. Introducción
+# Introduction
 
-La monitorización de residuos urbanos requiere información operacional de baja latencia: estado de los dispositivos, consumo de recursos, eventos de clasificación, confianza del modelo y trazabilidad histórica. En un entorno real, transmitir vídeo sin procesar hacia la nube es costoso, frágil y poco escalable. TrashUQ adopta una arquitectura Edge AI para ejecutar inferencia cerca del sensor y enviar únicamente telemetría estructurada.
+Waste monitoring systems need timely operational data: device availability, resource usage, inference latency, model confidence, event history, and fleet-level visibility. Sending raw video streams to a central server is expensive, fragile, and difficult to scale. TrashUQ therefore follows an Edge AI design: inference is intended to run close to the camera, and only structured telemetry is sent to the backend.
 
-MQTT encaja con este tipo de sistema porque es ligero, tolerante a enlaces inestables y está diseñado para comunicación publish/subscribe entre dispositivos. PostgreSQL aporta persistencia verificable e histórico para reconstruir el estado del dashboard después de reinicios. El frontend ofrece una vista operacional para demos y validación. La capa de Federated Learning prepara el camino para entrenar modelos distribuidos sin centralizar datos crudos, aunque el entrenamiento local real aún no está implementado.
+MQTT is used because it is lightweight, publish/subscribe oriented, and appropriate for edge telemetry. PostgreSQL gives the system durable, inspectable storage so the dashboard can be reconstructed after restarts. The web dashboard provides a real-time operational interface for demos and debugging. The Federated Learning layer prepares the coordination path for distributed model training without centralizing raw training data, although real local training is explicitly future work.
 
-## 2. System Overview
+# System Overview
 
-TrashUQ se divide en dos repositorios:
+The project is split across two repositories:
 
-| Repositorio | Responsabilidad |
+| Repository | Responsibility |
 |---|---|
-| `TrashUQ/` | Docker Compose, Mosquitto, PostgreSQL, backend FastAPI/gRPC, frontend Next.js. |
-| `edge/` | Cliente MQTT, simulador, smoke tests gRPC, wrapper de modelo TFLite y runtime de cámara/imagen/vídeo. |
+| `TrashUQ/` | Docker Compose stack, Mosquitto, PostgreSQL, FastAPI backend, gRPC FL server, Next.js frontend. |
+| `edge/` | MQTT edge client, no-hardware simulator, gRPC smoke tests, TensorFlow Lite model wrapper, camera/image/video runtime. |
 
-La arquitectura operativa es una ruta edge-to-cloud real:
+The implemented operational path is:
 
-1. El dispositivo edge publica telemetría MQTT.
-2. Mosquitto recibe mensajes en `1883` y WebSocket en `9001`.
-3. El backend se suscribe a `arduino/+/#`.
-4. El backend persiste cada mensaje en PostgreSQL.
-5. `/api/dashboard/bootstrap` reconstruye estado inicial e histórico reciente.
-6. El dashboard muestra estado y también escucha MQTT WebSocket para actualizaciones live.
-7. El cliente edge puede contactar al coordinador FL gRPC para `Join` y `GetGlobalModel`.
+1. An edge client publishes MQTT telemetry.
+2. Mosquitto receives MQTT traffic on `1883` and MQTT WebSocket traffic on `9001`.
+3. The backend subscribes to `arduino/+/#`.
+4. The backend stores every MQTT message in PostgreSQL.
+5. `/api/dashboard/bootstrap` returns normalized device, metric, event, classification, and FL state.
+6. The dashboard renders bootstrap data and applies live MQTT WebSocket updates.
+7. The edge client can contact the gRPC FL coordinator for `Join` and `GetGlobalModel`.
 
 ```mermaid
 flowchart LR
@@ -68,20 +90,20 @@ flowchart LR
   model --> edge
 ```
 
-## 3. Hardware and Edge Layer
+# Hardware and Edge Layer
 
-La capa edge representa el nodo que en producción ejecutará la lectura de cámara, inferencia local y publicación MQTT. El sistema ya puede ejecutarse sin hardware mediante `edge/app/edge_simulator.py`, y también contiene una preparación para inferencia real:
+The edge layer represents the device that will eventually read frames from a camera, run local inference, and publish telemetry to TrashUQ. The no-hardware simulator is already operational, while the real runtime is prepared for camera, image, or video input.
 
-| Elemento | Estado | Archivo |
+| Element | Status | File |
 |---|---:|---|
-| Simulador edge sin hardware | Implementado | `edge/app/edge_simulator.py` |
-| Cliente MQTT reusable | Implementado | `edge/app/mqtt_client.py` |
-| Cliente gRPC FL smoke | Implementado | `edge/app/fl_client.py` |
-| Wrapper de modelo real | Preparado | `edge/app/model_runner.py` |
-| Cámara/imagen/vídeo runtime | Preparado | `edge/app/camera_runtime.py`, `edge/app/real_edge_runtime.py` |
-| Modelo detectado | Preparado | `edge/models/trash_classifier.tflite` |
+| No-hardware simulator | Implemented | `edge/app/edge_simulator.py` |
+| Reusable MQTT client | Implemented | `edge/app/mqtt_client.py` |
+| gRPC FL smoke client | Implemented | `edge/app/fl_client.py` |
+| Real model wrapper | Prepared | `edge/app/model_runner.py` |
+| Camera/image/video runtime | Prepared | `edge/app/camera_runtime.py`, `edge/app/real_edge_runtime.py` |
+| Detected model artifact | Prepared | `edge/models/trash_classifier.tflite` |
 
-El modelo confirmado en el repositorio es TensorFlow Lite, con etiquetas por defecto `cardboard`, `glass`, `paper`, `plastic`. La salida normalizada en `ModelRunner.predict()` es clasificación:
+The model discovered in the repository is TensorFlow Lite. The default labels are `cardboard`, `glass`, `paper`, and `plastic`. The normalized runtime output is classification-only:
 
 ```json
 [
@@ -93,9 +115,9 @@ El modelo confirmado en el repositorio es TensorFlow Lite, con etiquetas por def
 ]
 ```
 
-> **Nota técnica.** El modelo actualmente documentado es classification-only. No se debe presentar como object detection ni como sistema con bounding boxes reales. El campo `bbox` se publica como `null` en el runtime real porque el modelo no produce coordenadas.
+> **Technical note.** The detected model is a classification model, not an object detection model. TrashUQ must not be presented as producing real bounding boxes until an object detection model is introduced.
 
-Escalado conceptual a múltiples nodos:
+Multi-device scalability is represented by the topic structure:
 
 ```mermaid
 flowchart LR
@@ -113,20 +135,20 @@ flowchart LR
   backend --> dashboard[Dashboard]
 ```
 
-## 4. MQTT Communication Layer
+# MQTT Communication Layer
 
-El root topic real es `arduino`, definido por `MQTT_TOPIC_ROOT` y usado por backend y frontend. Los tópicos esperados son:
+The MQTT topic root is `arduino`, configured through `MQTT_TOPIC_ROOT`. The backend subscribes to `arduino/+/#`, and the frontend subscribes to the same device topic family over MQTT WebSocket.
 
-| Tópico | Uso |
+| Topic | Purpose |
 |---|---|
-| `arduino/<device-id>/status` | Estado operativo del dispositivo. |
-| `arduino/<device-id>/metrics` | Métricas de inferencia, recursos y métricas FL simuladas/telemetría. |
-| `arduino/<device-id>/classification` | Resultado de clasificación. |
-| `arduino/<device-id>/event` | Eventos estructurados. |
-| `arduino/<device-id>/logs` | Logs del runtime edge. |
-| `arduino/<device-id>/help` | Solicitudes de revisión o ayuda. |
+| `arduino/<device-id>/status` | Device operational state. |
+| `arduino/<device-id>/metrics` | Inference, resource, and FL-style metric telemetry. |
+| `arduino/<device-id>/classification` | Classification result. |
+| `arduino/<device-id>/event` | Structured runtime or detection events. |
+| `arduino/<device-id>/logs` | Edge runtime logs. |
+| `arduino/<device-id>/help` | Help or review requests. |
 
-Payload real de status compatible con dashboard:
+Status payload:
 
 ```json
 {
@@ -146,7 +168,7 @@ Payload real de status compatible con dashboard:
 }
 ```
 
-Payload de metrics usado para cards y charts:
+Metrics payload:
 
 ```json
 {
@@ -167,7 +189,7 @@ Payload de metrics usado para cards y charts:
 }
 ```
 
-Payload de clasificación:
+Classification payload from the real runtime:
 
 ```json
 {
@@ -182,7 +204,7 @@ Payload de clasificación:
 }
 ```
 
-Payload de evento:
+Event payload:
 
 ```json
 {
@@ -197,7 +219,7 @@ Payload de evento:
 }
 ```
 
-Payload de log:
+Log payload:
 
 ```json
 {
@@ -231,86 +253,78 @@ sequenceDiagram
   Broker-->>UI: MQTT WebSocket live update
 ```
 
-## 5. Backend Architecture
+# Backend Architecture
 
-El backend se implementa con FastAPI y arranca tres responsabilidades en `TrashUQ/backend/app/main.py`:
+The backend is a FastAPI service. On startup, `TrashUQ/backend/app/main.py` initializes the database schema, starts the gRPC server, and starts the MQTT ingest runtime.
 
-1. `ensure_schema()` inicializa tablas e índices.
-2. `GrpcServerRuntime` expone el servicio FL gRPC.
-3. `MqttIngestRuntime` se conecta a Mosquitto y se suscribe a `arduino/+/#`.
+HTTP endpoints:
 
-Endpoints HTTP principales:
-
-| Endpoint | Respuesta |
+| Endpoint | Purpose |
 |---|---|
-| `GET /health` | `{"ok": true}` |
-| `GET /api/dashboard/bootstrap` | Estado real para dashboard: devices, metrics, metricHistory, streams y estado FL. |
-| `GET /api/fl/state` | Snapshot mínimo del coordinador FL. |
+| `GET /health` | Health check returning `{"ok": true}`. |
+| `GET /api/dashboard/bootstrap` | Normalized dashboard state from PostgreSQL and FL coordinator state. |
+| `GET /api/fl/state` | Minimal FL coordinator snapshot. |
 
-Componentes y puertos reales:
+Real service topology:
 
 | Component | Responsibility | Port | Technology |
 |---|---|---:|---|
-| `frontend` | Dashboard, proxy API, MQTT WebSocket client | `3000` | Next.js |
+| `frontend` | Dashboard, API proxy, MQTT WebSocket client | `3000` | Next.js |
 | `backend` | REST API, MQTT ingest, gRPC FL runtime | `4000`, `50051` | FastAPI, grpcio |
-| `mqtt` | Broker MQTT y WebSocket | `1883`, `9001` | Eclipse Mosquitto |
-| `db` | Persistencia de telemetría e histórico | `5432` host mapping por defecto | PostgreSQL 16 |
-| `edge` | Cliente, simulador, runtime real | proceso local | Python, OpenCV, MQTT, gRPC |
+| `mqtt` | MQTT and WebSocket broker | `1883`, `9001` | Eclipse Mosquitto |
+| `db` | Telemetry and history persistence | `5432` host mapping by default | PostgreSQL 16 |
+| `edge` | Simulator and real runtime | local process | Python, OpenCV, MQTT, gRPC |
 
-El proxy frontend se define en `TrashUQ/frontend/app/api/[...path]/route.ts` y usa `BACKEND_API_URL=http://backend:4000` dentro de Docker. Esto evita el error clásico de intentar llamar a `127.0.0.1:4000` desde el contenedor frontend.
+The frontend API route `TrashUQ/frontend/app/api/[...path]/route.ts` proxies `/api/*` requests to `BACKEND_API_URL=http://backend:4000` inside Docker. Browser-side MQTT connects to `ws://localhost:9001/mqtt`, which is correct because the WebSocket is opened from the user’s browser.
 
-## 6. Database Layer
+# Database Layer
 
-PostgreSQL actúa como fuente verificable del histórico MQTT. El esquema se inicializa en `TrashUQ/backend/app/db.py`.
+PostgreSQL provides a durable telemetry log and derived dashboard state. The schema is created in `TrashUQ/backend/app/db.py`.
 
-Tablas relevantes:
-
-| Tabla | Uso |
+| Table | Purpose |
 |---|---|
-| `mqtt_messages` | Registro completo de cada mensaje MQTT recibido. |
-| `device_status_latest` | Último estado parseado por dispositivo. |
-| `device_status_history` | Histórico de estados. |
-| `coordinator_metrics` | Métricas agregadas derivadas de payloads `metrics`. |
+| `mqtt_messages` | Full record of every MQTT message received. |
+| `device_status_latest` | Latest parsed device state. |
+| `device_status_history` | Historical device states. |
+| `coordinator_metrics` | Aggregated metrics derived from `metrics` payloads. |
 
-Campos principales de `mqtt_messages`:
+Main `mqtt_messages` fields:
 
-| Campo | Significado |
+| Field | Meaning |
 |---|---|
-| `topic` | Tópico MQTT completo. |
-| `kind` | `status`, `metrics`, `event`, `classification`, `help`, `logs` u `other`. |
-| `device_id` | Device ID inferido del tópico. |
-| `payload_text` / `payload` | Payload original como texto. |
-| `payload_json` | JSONB si el payload es JSON válido. |
-| `recorded_at` | Timestamp en milisegundos. |
-| `created_at` | Timestamp SQL derivado. |
+| `topic` | Full MQTT topic. |
+| `kind` | `status`, `metrics`, `event`, `classification`, `help`, `logs`, or `other`. |
+| `device_id` | Device identifier inferred from the topic. |
+| `payload_text` / `payload` | Original payload as text. |
+| `payload_json` | JSONB payload if parsing succeeds. |
+| `recorded_at` | Millisecond timestamp. |
+| `created_at` | SQL timestamp derived from `recorded_at`. |
 
-Consulta de verificación:
+Verification query:
 
 ```sh
 docker compose exec db psql -U trashuq -d dashboard -c "select topic, payload, created_at from mqtt_messages order by created_at desc limit 20;"
 ```
 
-## 7. Frontend Dashboard
+# Frontend Dashboard
 
-El dashboard Next.js consume datos por dos vías:
+The dashboard consumes data through two live paths:
 
-1. Bootstrap inicial y polling: `fetch("/api/dashboard/bootstrap")`.
-2. Actualización live: MQTT WebSocket `ws://localhost:9001/mqtt`.
+1. Initial and periodic bootstrap: `fetch("/api/dashboard/bootstrap")`.
+2. Real-time updates: MQTT WebSocket `ws://localhost:9001/mqtt`.
 
-El frontend no necesita mocks para la ruta principal. Si no hay datos reales, muestra estados vacíos o mensajes de espera. Las vistas principales incluyen:
+The main dashboard path does not use mock devices. If real data is unavailable, the UI shows empty or waiting states instead of fabricated curves.
 
-| Vista / elemento | Fuente real |
+| Dashboard area | Real source |
 |---|---|
-| Active Devices | `devices` desde bootstrap + status MQTT live. |
-| Current Round | estado FL y métricas MQTT con `round`. |
-| Global Accuracy / Loss | `metrics.globalAccuracy`, `metrics.globalLoss`, `metricHistory`. |
-| Avg CPU / RAM | status y metrics MQTT parseados. |
-| Live Client Summary | estado, CPU, RAM, mode, latest classification, confidence. |
-| Event Stream | `event`, `logs` y MQTT live. |
-| Local Training Loss chart | `metricHistory` con `localLoss` / `globalLoss`. |
-| Client Drift chart | `metricHistory` con `drift`. |
-
-Cuando no existe métrica FL real para loss o drift, el dashboard muestra waiting states como “Waiting for FL metric data...” en vez de pintar curvas falsas.
+| Active Devices | `devices` from bootstrap plus live status MQTT. |
+| Current Round | FL state and metrics payloads containing `round`. |
+| Global Accuracy / Loss | `metrics.globalAccuracy`, `metrics.globalLoss`, and `metricHistory`. |
+| Average CPU / RAM | Parsed status and metrics MQTT payloads. |
+| Live Client Summary | Device state, CPU, RAM, mode, latest classification, confidence. |
+| Event Stream | `event`, `logs`, and MQTT live updates. |
+| Local Training Loss chart | `metricHistory` with `localLoss` / `globalLoss`. |
+| Client Drift chart | `metricHistory` with `drift`. |
 
 ```mermaid
 flowchart LR
@@ -326,28 +340,24 @@ flowchart LR
   mqtt["Mosquitto broker"] --> websocket
 ```
 
-## 8. Federated Learning Layer
+# Federated Learning Layer
 
-La capa FL usa gRPC y el proto real en `TrashUQ/backend/app/fl.proto`.
+Federated Learning coordination is exposed through the real proto file at `TrashUQ/backend/app/fl.proto`.
 
-RPCs disponibles:
-
-| RPC | Request | Response |
+| RPC | Request fields | Response fields |
 |---|---|---|
 | `Join` | `client_id` | `ok`, `message`, `round`, `model_version`, `global_weights` |
 | `GetGlobalModel` | `client_id` | `ok`, `message`, `round`, `model_version`, `global_weights` |
 | `SubmitUpdate` | `client_id`, `round`, `num_samples`, `local_weights`, `local_loss`, `local_accuracy` | `ok`, `message`, `round_aggregated`, `current_round`, `model_version` |
 
-El coordinador actual mantiene estado en memoria: clientes online, ronda, versión de modelo, pesos globales y updates pendientes. El tamaño del modelo por defecto es `FL_MODEL_SIZE=16` y el mínimo por ronda es `FL_MIN_CLIENTS_PER_ROUND=2`.
+The current coordinator stores state in memory: online clients, current round, model version, global weights, and pending updates. The default model size is controlled by `FL_MODEL_SIZE=16`, and the default minimum number of clients per round is `FL_MIN_CLIENTS_PER_ROUND=2`.
 
-Estado actual:
-
-| Capacidad | Estado |
+| Capability | Status |
 |---|---:|
-| `Join` desde edge | Funciona. |
-| `GetGlobalModel` desde edge | Funciona. |
-| `SubmitUpdate` desde edge | Se omite correctamente. |
-| Entrenamiento local real | Pendiente. |
+| Edge `Join` | Works. |
+| Edge `GetGlobalModel` | Works. |
+| Edge `SubmitUpdate` | Intentionally skipped. |
+| Real local training | Pending. |
 
 ```mermaid
 sequenceDiagram
@@ -371,42 +381,42 @@ sequenceDiagram
   Note over Edge,FL: SubmitUpdate is intentionally skipped today because the edge repo does not yet produce a real local update payload.
 ```
 
-## 9. Edge Simulator and No-Hardware Demo
+# Edge Simulator and No-Hardware Demo
 
-El simulador es una pieza clave para demos sin hardware. No es un mock de frontend: publica mensajes MQTT reales hacia Mosquitto, el backend los persiste en PostgreSQL y el dashboard los consume por la misma ruta que usaría un dispositivo real.
+The simulator enables a full demonstration without Arduino hardware, a camera, or a local model runtime. It is not a UI mock. It publishes real MQTT messages that are ingested by the real broker, persisted by the real backend, and displayed by the real dashboard.
 
-Comando principal:
+Run it with:
 
 ```sh
 cd ~/Documents/TrashNet/edge
 uv run python -m app.edge_simulator
 ```
 
-El simulador publica:
+The simulator publishes:
 
-| Tipo | Contenido |
+| Type | Content |
 |---|---|
-| `status` | online/offline, CPU, RAM, temperatura, heartbeat, modo. |
-| `metrics` | FPS, inferencia, CPU/RAM, accuracy/loss, round, samples, drift. |
-| `classification` | etiquetas simuladas como `trash`, `plastic`, `paper`, `metal`, `organic`, `clean`. |
-| `event` | eventos de detección. |
-| `logs` | actividad del loop. |
-| `help` | revisión si la confianza es baja. |
+| `status` | Online/offline state, CPU, RAM, temperature, heartbeat, mode. |
+| `metrics` | FPS, inference latency, CPU/RAM, accuracy/loss, round, samples, drift. |
+| `classification` | Simulated labels such as `trash`, `plastic`, `paper`, `metal`, `organic`, `clean`. |
+| `event` | Detection and runtime events. |
+| `logs` | Runtime loop activity. |
+| `help` | Review/help requests when confidence is low. |
 
-## 10. Real Model Runtime Preparation
+# Real Model Runtime Preparation
 
-El repositorio `edge/` ya contiene la preparación para ejecutar inferencia real:
+The `edge/` repository is prepared for real inference:
 
-| Archivo | Función |
+| File | Role |
 |---|---|
-| `edge/app/model_runner.py` | Carga `models/trash_classifier.tflite` mediante el clasificador existente. |
-| `edge/app/camera_runtime.py` | Fuente de frames: `camera`, `image`, `video`. |
-| `edge/app/real_edge_runtime.py` | Loop de inferencia, MQTT publish y smoke FL no bloqueante. |
-| `edge/scripts/test_model_load.py` | Verifica carga del modelo. |
-| `edge/scripts/test_camera_open.py` | Verifica apertura de cámara. |
-| `edge/scripts/test_single_image_inference.py` | Ejecuta inferencia sobre una imagen. |
+| `edge/app/model_runner.py` | Loads `models/trash_classifier.tflite` through the existing classifier path. |
+| `edge/app/camera_runtime.py` | Provides `camera`, `image`, and `video` frame sources. |
+| `edge/app/real_edge_runtime.py` | Runs inference, publishes MQTT payloads, and performs non-blocking FL smoke checks. |
+| `edge/scripts/test_model_load.py` | Verifies model loading. |
+| `edge/scripts/test_camera_open.py` | Verifies camera access. |
+| `edge/scripts/test_single_image_inference.py` | Runs inference on one image. |
 
-Variables principales:
+Runtime variables:
 
 ```sh
 EDGE_INPUT_SOURCE=camera
@@ -419,11 +429,11 @@ EDGE_INFERENCE_INTERVAL_SEC=1
 EDGE_MAX_FPS=10
 ```
 
-> **Limitación actual.** El runtime real requiere `tflite_runtime` o TensorFlow Lite compatible. En el entorno local inspeccionado, el test de modelo falla de forma explícita si esa dependencia no está instalada; esto es correcto porque no se debe simular inferencia real.
+> **Current limitation.** Real model execution requires `tflite_runtime` or TensorFlow Lite support in the target Python environment. If the dependency is missing, `test_model_load.py` fails clearly instead of pretending inference works.
 
-## 11. Verification and Testing
+# Verification and Testing
 
-### Start full stack
+## Start the full stack
 
 ```sh
 cd ~/Documents/TrashNet/TrashUQ
@@ -431,42 +441,42 @@ docker compose down
 docker compose up --build
 ```
 
-### Backend health
+## Backend health
 
 ```sh
 curl http://localhost:4000/health
 curl http://localhost:4000/api/dashboard/bootstrap
 ```
 
-### Frontend proxy
+## Frontend proxy
 
 ```sh
 curl http://localhost:3000/api/dashboard/bootstrap
 docker compose exec frontend sh -lc 'wget -qO- http://backend:4000/health || curl -s http://backend:4000/health'
 ```
 
-### MQTT monitor
+## MQTT monitor
 
 ```sh
 cd ~/Documents/TrashNet/TrashUQ
 docker compose exec mqtt mosquitto_sub -h localhost -p 1883 -t 'arduino/+/+' -v
 ```
 
-### Edge simulator
+## Edge simulator
 
 ```sh
 cd ~/Documents/TrashNet/edge
 uv run python -m app.edge_simulator
 ```
 
-### gRPC smoke
+## gRPC smoke test
 
 ```sh
 cd ~/Documents/TrashNet/edge
 uv run python scripts/test_fl_grpc.py
 ```
 
-Resultado esperado:
+Expected result:
 
 ```text
 Join: ok=True ...
@@ -474,116 +484,114 @@ GetGlobalModel: ok=True ...
 SubmitUpdate skipped: real local training/model update is not implemented in the edge repo yet.
 ```
 
-### Model load
+## Model load
 
 ```sh
 cd ~/Documents/TrashNet/edge
 uv run python scripts/test_model_load.py
 ```
 
-### DB verification
+## Database verification
 
 ```sh
 cd ~/Documents/TrashNet/TrashUQ
 docker compose exec db psql -U trashuq -d dashboard -c "select topic, payload, created_at from mqtt_messages order by created_at desc limit 20;"
 ```
 
-## 12. Results
+# Results
 
-Resultados alcanzados:
-
-| Resultado | Estado |
+| Result | Status |
 |---|---:|
-| MQTT end-to-end desde edge a broker | Verificado. |
-| Persistencia backend en PostgreSQL | Verificado. |
-| Dashboard recibe datos reales por bootstrap y WebSocket | Verificado. |
-| Simulador edge llena cards, streams y charts mediante MQTT real | Implementado. |
-| Charts usan historial real `metricHistory` o waiting state | Implementado. |
-| gRPC `Join` y `GetGlobalModel` | Verificado. |
-| Wrapper de modelo real TFLite | Implementado/preparado. |
-| Runtime de cámara/imagen/vídeo | Implementado/preparado. |
+| MQTT end-to-end from edge to broker | Verified. |
+| Backend persistence in PostgreSQL | Verified. |
+| Dashboard receives real backend/MQTT data | Verified. |
+| Edge simulator populates dashboard cards, streams, and charts through MQTT | Implemented. |
+| Charts use real `metricHistory` or waiting states | Implemented. |
+| gRPC `Join` and `GetGlobalModel` | Verified. |
+| TensorFlow Lite model wrapper | Implemented/prepared. |
+| Camera/image/video runtime | Implemented/prepared. |
 
-Resultados no reclamados:
+Not claimed as completed:
 
-| Elemento | Motivo |
+| Item | Reason |
 |---|---|
-| Entrenamiento local federado real | No hay implementación que produzca `local_weights`, `local_loss`, `local_accuracy`. |
-| `SubmitUpdate` real | Se omite de forma explícita. |
-| Bounding boxes reales | El modelo detectado es classification-only. |
-| Ejecución real TFLite garantizada en cualquier host | Depende de instalar runtime compatible. |
+| Real federated local training | No implementation currently produces `local_weights`, `local_loss`, and `local_accuracy`. |
+| Real `SubmitUpdate` | Intentionally skipped until local training exists. |
+| Real bounding boxes | The detected model is classification-only. |
+| Guaranteed TFLite execution on every host | Depends on a compatible TFLite runtime installation. |
 
-## 13. Limitaciones
+# Limitations
 
-- `SubmitUpdate` real no está implementado en el edge repo.
-- No existe aún tracking de privacy budget.
-- No existe dashboard específico de calidad de dataset.
-- No se miden costes de comunicación por ronda FL.
-- El modelo actual es de clasificación, no detección con bounding boxes.
-- La ejecución con cámara depende del hardware, permisos del dispositivo y runtime TFLite.
-- El coordinador FL mantiene estado en memoria; no persiste rondas o pesos globales en base de datos.
-- La seguridad MQTT/gRPC está preparada para configuración básica, pero no hay hardening completo de producción.
+- Real `SubmitUpdate` is not implemented in the edge repository.
+- No privacy budget tracking is implemented yet.
+- There is no dataset-quality dashboard yet.
+- Communication cost per FL round is not measured yet.
+- The current model is classification-only, not object detection.
+- Camera execution depends on target hardware, camera permissions, and TFLite runtime availability.
+- The FL coordinator stores its state in memory; rounds and global weights are not persisted yet.
+- MQTT/gRPC security hardening remains future work.
 
-## 14. Future Work
+# Future Work
 
-- Conectar cámara y hardware Arduino/edge.
-- Instalar `tflite_runtime` o TensorFlow Lite en el dispositivo objetivo.
-- Ejecutar stream real de clasificación y observarlo en dashboard.
-- Añadir fine-tuning o entrenamiento local real en edge.
-- Implementar `SubmitUpdate` con payload válido.
-- Persistir rondas FL, pesos globales y métricas por cliente.
-- Añadir model registry y versionado operacional.
-- Implementar analytics por dispositivo.
-- Añadir drift detection de dataset y modelo.
-- Endurecer seguridad: autenticación MQTT, TLS, credenciales gRPC, autorización por dispositivo.
-- Desplegar una flota real de nodos edge.
+- Connect Arduino/camera hardware.
+- Install `tflite_runtime` or TensorFlow Lite on the target edge device.
+- Run a real classification stream through the dashboard.
+- Add real local training or fine-tuning.
+- Implement `SubmitUpdate` with valid model updates.
+- Persist FL rounds, global weights, and per-client metrics.
+- Add a model registry and operational model versioning.
+- Add per-device performance analytics.
+- Add dataset and model drift detection.
+- Harden security with MQTT authentication, TLS, device authorization, and gRPC credentials.
+- Deploy to a real edge fleet.
 
-## 15. Demo Script
+# Demo Script
 
-Guion recomendado para una demo live:
+Recommended live demo flow:
 
-1. Arrancar la plataforma:
+1. Start the platform:
 
 ```sh
 cd ~/Documents/TrashNet/TrashUQ
 docker compose up --build
 ```
 
-2. Abrir el dashboard:
+2. Open the dashboard:
 
 ```text
 http://localhost:3000
 ```
 
-3. Ejecutar el simulador edge:
+3. Run the edge simulator:
 
 ```sh
 cd ~/Documents/TrashNet/edge
 uv run python -m app.edge_simulator
 ```
 
-4. Mostrar en el dashboard:
+4. Show in the dashboard:
 
 - `unoq-01` online.
-- CPU/RAM/heartbeat actualizándose.
-- Clasificaciones en vivo.
-- Event Stream con mensajes reales MQTT.
-- Charts de loss/drift si llegan métricas con `localLoss`, `globalLoss` y `drift`.
+- CPU/RAM/heartbeat updating.
+- Live classification events.
+- Real MQTT event stream.
+- Loss/drift charts if metrics with `localLoss`, `globalLoss`, and `drift` are being published.
 
-5. Verificar persistencia:
+5. Verify database persistence:
 
 ```sh
 cd ~/Documents/TrashNet/TrashUQ
 docker compose exec db psql -U trashuq -d dashboard -c "select topic, payload, created_at from mqtt_messages order by created_at desc limit 20;"
 ```
 
-6. Verificar gRPC:
+6. Verify gRPC:
 
 ```sh
 cd ~/Documents/TrashNet/edge
 uv run python scripts/test_fl_grpc.py
 ```
 
-7. Explicar readiness de cámara/modelo:
+7. Explain real camera/model readiness:
 
 ```sh
 cd ~/Documents/TrashNet/edge
@@ -591,7 +599,7 @@ EDGE_CAMERA_INDEX=0 uv run python scripts/test_camera_open.py
 uv run python scripts/test_model_load.py
 ```
 
-## 16. Deployment Topology
+# Deployment Topology
 
 ```mermaid
 flowchart TB
@@ -619,20 +627,24 @@ flowchart TB
   external --> backend
 ```
 
-## 17. Glossary
+# Glossary
 
-| Term | Definición |
+| Term | Definition |
 |---|---|
-| Edge AI | Inferencia de IA ejecutada cerca del sensor/dispositivo. |
-| MQTT | Protocolo publish/subscribe ligero para telemetría. |
-| gRPC | RPC binario basado en HTTP/2 y Protocol Buffers. |
-| Federated Learning | Entrenamiento distribuido donde los clientes envían updates, no datos crudos. |
-| Global model | Modelo agregado mantenido por el coordinador FL. |
-| Local update | Actualización entrenada localmente por un cliente edge. |
-| Dashboard bootstrap | Estado inicial servido por backend para reconstruir el dashboard. |
-| Telemetry | Métricas, eventos, logs y estado operacional enviados por dispositivos. |
-| TFLite | TensorFlow Lite, runtime/model format optimizado para edge. |
+| Edge AI | AI inference executed close to the sensor or device. |
+| MQTT | Lightweight publish/subscribe protocol for telemetry. |
+| gRPC | Binary RPC framework based on HTTP/2 and Protocol Buffers. |
+| Federated Learning | Distributed learning where clients send updates instead of raw data. |
+| Global model | Aggregated model maintained by the FL coordinator. |
+| Local update | Locally trained client update submitted to the coordinator. |
+| Dashboard bootstrap | Initial backend state used to reconstruct the dashboard. |
+| Telemetry | Operational status, metrics, events, logs, and classifications. |
+| TFLite | TensorFlow Lite, a model format/runtime optimized for edge environments. |
 
-## 18. Conclusión
+# Logo Source
 
-TrashUQ ya demuestra una canalización real edge-to-cloud: un cliente edge publica MQTT, Mosquitto enruta mensajes, FastAPI persiste en PostgreSQL, y el dashboard visualiza estado y métricas en vivo. El simulador permite una demo completa sin hardware, pero no falsifica datos en frontend: todo atraviesa la infraestructura real. La integración gRPC valida el camino de coordinación federada con `Join` y `GetGlobalModel`, y el runtime TFLite prepara el salto hacia cámara/modelo real. El siguiente hito técnico es cerrar el bucle de entrenamiento local: generar updates válidos en edge, enviar `SubmitUpdate` y persistir métricas FL de producción por ronda y dispositivo.
+The cover includes the Universitat de Lleida logo from Wikimedia Commons: `File:Logo Universitat de Lleida.svg`. The file page states that the source is `www.udl.cat` and identifies the asset as a public-domain text/logo. A local copy is stored in `docs/paper/assets/udl_logo.svg` and rendered to `docs/paper/assets/udl_logo.png` for PDF generation.
+
+# Conclusion
+
+TrashUQ already demonstrates a real edge-to-cloud monitoring platform: edge clients publish MQTT telemetry, Mosquitto routes it, FastAPI persists it in PostgreSQL, and the Next.js dashboard visualizes live device and metric state. The simulator enables a complete no-hardware demo without faking frontend data. The gRPC path validates the first Federated Learning coordinator operations through `Join` and `GetGlobalModel`, and the TensorFlow Lite runtime prepares the system for real camera-based classification. The next technical milestone is to close the local training loop: generate valid edge updates, call `SubmitUpdate`, persist FL rounds, and evaluate model performance across real devices.

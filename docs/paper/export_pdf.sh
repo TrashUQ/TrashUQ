@@ -15,7 +15,15 @@ cd "${ROOT_DIR}"
 
 try_pandoc() {
   local engine="$1"
-  local args=( "${INPUT}" -o "${OUTPUT}" --toc --number-sections )
+  local args=(
+    "${INPUT}"
+    -o "${OUTPUT}"
+    --number-sections
+    -V "geometry:margin=1in"
+    -V "colorlinks=true"
+    -V "linkcolor=blue"
+    -V "urlcolor=blue"
+  )
   if [ -n "${engine}" ]; then
     args+=( "--pdf-engine=${engine}" )
   fi
@@ -36,8 +44,8 @@ if command -v pandoc >/dev/null 2>&1; then
 fi
 
 if command -v npx >/dev/null 2>&1; then
-  if npx --yes md-to-pdf --version >/dev/null 2>&1; then
-    npx --yes md-to-pdf "${INPUT}" --dest "${SCRIPT_DIR}"
+  if npx --no-install md-to-pdf --version >/dev/null 2>&1; then
+    npx --no-install md-to-pdf "${INPUT}" --dest "${SCRIPT_DIR}"
     echo "PDF exported with md-to-pdf in: ${SCRIPT_DIR}"
     exit 0
   fi
