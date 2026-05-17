@@ -1,6 +1,0 @@
-[submodule "model/trashnet"]
-	path = model/trashnet
-	url = https://github.com/garythung/trashnet.git
-[submodule "model/TrashBox"]
-	path = model/TrashBox
-	url = https://github.com/nikhilvenkatkumsetty/TrashBox.git
