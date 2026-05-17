@@ -1,0 +1,25 @@
+flowchart TB
+  Browser["Browser<br/>http://localhost:3000"]
+
+  subgraph Host["TrashUQ host"]
+    subgraph Compose["Docker Compose"]
+      Frontend["frontend<br/>Next.js<br/>3000"]
+      Backend["backend<br/>FastAPI + gRPC<br/>4000 / 50051"]
+      DB["db<br/>PostgreSQL<br/>5432"]
+      MQTT["mqtt<br/>Mosquitto<br/>1883 / 9001"]
+    end
+  end
+
+  UnoReal["unoq-01<br/>real Arduino/camera node"]
+  UnoMock["unoq-02<br/>mock/synthetic node"]
+  EdgeSim["edge simulator<br/>uv run python -m app.edge_simulator"]
+
+  Browser --> Frontend
+  Browser -->|"WebSocket MQTT"| MQTT
+  Frontend -->|"BACKEND_API_URL=http://backend:4000"| Backend
+  Backend --> DB
+  Backend -->|"subscribe arduino/+/#"| MQTT
+  UnoReal -->|"MQTT + optional gRPC smoke"| MQTT
+  UnoReal -->|"gRPC :50051"| Backend
+  UnoMock -->|"MQTT synthetic telemetry"| MQTT
+  EdgeSim -->|"MQTT demo telemetry"| MQTT

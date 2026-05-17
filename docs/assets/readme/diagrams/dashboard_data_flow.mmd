@@ -1,0 +1,15 @@
+flowchart LR
+  DB["PostgreSQL<br/>mqtt_messages<br/>device_status_latest<br/>coordinator_metrics"]
+  Backend["Backend bootstrap<br/>GET /api/dashboard/bootstrap"]
+  MQTT["MQTT WebSocket<br/>ws://localhost:9001/mqtt"]
+  React["React dashboard state"]
+  Cards["Device cards<br/>CPU/RAM/heartbeat"]
+  Charts["Charts<br/>accuracy/loss/drift"]
+  Streams["Event, log, help,<br/>classification streams"]
+
+  DB -->|"persisted historical/latest data"| Backend
+  Backend -->|"initial snapshot + polling"| React
+  MQTT -->|"live topic updates"| React
+  React --> Cards
+  React --> Charts
+  React --> Streams

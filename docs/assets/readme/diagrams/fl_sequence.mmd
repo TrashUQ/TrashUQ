@@ -1,0 +1,19 @@
+sequenceDiagram
+  participant Client as Edge FL Client
+  participant Coord as FL Coordinator<br/>gRPC :50051
+  participant Agg as FedAvg Aggregation
+
+  Client->>Coord: Join(client_id)
+  Coord-->>Client: round, model_version, global_weights
+  Client->>Coord: GetGlobalModel(client_id)
+  Coord-->>Client: current global weights
+  Client->>Coord: SubmitUpdate(client_id, round, num_samples, local_weights, local_loss, local_accuracy)
+  alt enough updates for round
+    Coord->>Agg: weighted average by num_samples
+    Agg-->>Coord: new global weights
+    Coord-->>Client: round_aggregated=true, new model_version
+  else waiting for more clients
+    Coord-->>Client: accepted but pending
+  end
+
+  Note over Client,Coord: Edge smoke script validates Join/GetGlobalModel. Real local training update generation is not implemented in the edge repo yet.

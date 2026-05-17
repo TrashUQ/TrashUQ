@@ -1,0 +1,26 @@
+flowchart LR
+  subgraph Edge["Arduino / Edge Nodes"]
+    Arduino["unoq-01<br/>real Arduino/camera node"]
+    Mock["unoq-02<br/>mock/synthetic node"]
+    Simulator["No-hardware<br/>edge simulator"]
+  end
+
+  subgraph Compose["TrashUQ Docker Compose"]
+    MQTT["Mosquitto MQTT<br/>1883 / ws 9001"]
+    Backend["FastAPI Backend<br/>REST 4000 + gRPC 50051"]
+    DB["PostgreSQL<br/>5432"]
+    Frontend["Next.js Dashboard<br/>3000"]
+  end
+
+  Browser["Browser"]
+
+  Arduino -->|"MQTT arduino/&lt;device&gt;/status, metrics, classification, event, logs, help"| MQTT
+  Mock -->|"MQTT arduino/&lt;device&gt;/..."| MQTT
+  Simulator -->|"MQTT arduino/&lt;device&gt;/..."| MQTT
+  MQTT -->|"backend subscribes arduino/+/#"| Backend
+  Backend -->|"persist messages + dashboard state"| DB
+  Frontend -->|"GET /api/dashboard/bootstrap"| Backend
+  Browser -->|"http://localhost:3000"| Frontend
+  Browser -->|"MQTT WebSocket ws://localhost:9001/mqtt"| MQTT
+  Arduino -->|"gRPC Join / GetGlobalModel"| Backend
+  Simulator -. "gRPC smoke client" .-> Backend
