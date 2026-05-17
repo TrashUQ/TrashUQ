@@ -98,7 +98,10 @@ class Pipeline:
                 self._label_timer = None
             self._pending_item = None
             self._state = BinState.IDLE
-        self._store.relabel(sample_id, label, "user")
+        # "others" = item doesn't fit any class — kept for the record but
+        # tagged so the fine-tuner ignores it (label_src != 'user').
+        is_trainable = label in self._cfg.labels
+        self._store.relabel(sample_id, label, "user" if is_trainable else "user_other")
         logger.info("User labeled %s as '%s'", sample_id, label)
 
         if self._telemetry is not None:
@@ -110,14 +113,36 @@ class Pipeline:
         if label == self._cfg.bin_class:
             threading.Thread(target=self._open_then_close_lid, daemon=True).start()
 
-        # Notify FL client if hooked in
-        if self._finetune_hook is not None:
+        # Notify FL client only for real training labels
+        if is_trainable and self._finetune_hook is not None:
             try:
                 self._finetune_hook()
             except Exception:
                 logger.exception("Finetune hook failed")
 
         broadcaster.emit({"type": "state", "state": "IDLE"})
+
+    def inject_labeled_sample(self, frame, label: str) -> str:
+        """Bypass capture+UI: persist a pre-labeled frame as a user sample and
+        notify the FL hook. Used by the offline label feeder for validation runs.
+        """
+        if label not in self._cfg.labels:
+            raise ValueError(f"label must be one of {self._cfg.labels}, got {label!r}")
+        sample_id = self._store.save(frame, label, "user", confidence=1.0)
+        if self._telemetry is not None:
+            self._telemetry.publish_event(
+                "label_received",
+                sample_id=sample_id,
+                label=label,
+                bin_class=self._cfg.bin_class,
+                source="inject",
+            )
+        if self._finetune_hook is not None:
+            try:
+                self._finetune_hook()
+            except Exception:
+                logger.exception("Finetune hook failed (inject)")
+        return sample_id
 
     def _preview_loop(self) -> None:
         """Continuously push frames to the monitor MJPEG stream."""

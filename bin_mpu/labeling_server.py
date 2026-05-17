@@ -3,7 +3,9 @@ import logging
 from collections.abc import Callable
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+import cv2
+import numpy as np
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
@@ -97,9 +99,10 @@ _HTML = """<!DOCTYPE html>
     .btn:active { transform: scale(0.95); filter: brightness(0.85); }
     .btn:disabled { opacity: 0.3; cursor: not-allowed; }
     .btn:disabled:active { transform: none; filter: none; }
-    .btn-paper  { background: #2563eb; color: #fff; }
-    .btn-carton { background: #d97706; color: #fff; }
-    .btn-glass  { background: #059669; color: #fff; }
+    .btn-paper   { background: #2563eb; color: #fff; }
+    .btn-plastic { background: #d97706; color: #fff; }
+    .btn-glass   { background: #059669; color: #fff; }
+    .btn-others  { background: #4b5563; color: #fff; }
     #flash {
       position: fixed;
       inset: 0;
@@ -124,14 +127,17 @@ _HTML = """<!DOCTYPE html>
   <div id="hint" style="display:none"></div>
 
   <div id="buttons">
-    <button class="btn btn-paper"  onclick="submitLabel('paper')"  disabled>
+    <button class="btn btn-paper"   onclick="submitLabel('paper')"   disabled>
       <span class="btn-icon">📄</span>Paper
     </button>
-    <button class="btn btn-carton" onclick="submitLabel('carton')" disabled>
-      <span class="btn-icon">📦</span>Carton
+    <button class="btn btn-plastic" onclick="submitLabel('plastic')" disabled>
+      <span class="btn-icon">🧴</span>Plastic
     </button>
-    <button class="btn btn-glass"  onclick="submitLabel('glass')"  disabled>
+    <button class="btn btn-glass"   onclick="submitLabel('glass')"   disabled>
       <span class="btn-icon">🫙</span>Glass
+    </button>
+    <button class="btn btn-others"  onclick="submitLabel('others')"  disabled>
+      <span class="btn-icon">❓</span>Other
     </button>
   </div>
 
@@ -217,6 +223,7 @@ def create_app(
     get_pending: Callable[[], dict | None],
     submit_label: Callable[[str, str], None],
     valid_labels: list[str],
+    inject_sample: Callable[[np.ndarray, str], str] | None = None,
 ) -> FastAPI:
     app = FastAPI(docs_url=None, redoc_url=None)
 
@@ -248,9 +255,38 @@ def create_app(
 
     @app.post("/api/label")
     def api_label(req: _LabelRequest) -> dict:
-        if req.label not in valid_labels:
-            raise HTTPException(status_code=400, detail=f"invalid label, must be one of {valid_labels}")
+        # "others" = item doesn't fit any class — recorded but excluded from training
+        if req.label not in valid_labels and req.label != "others":
+            raise HTTPException(
+                status_code=400,
+                detail=f"invalid label, must be one of {valid_labels} or 'others'",
+            )
         submit_label(req.id, req.label)
         return {"ok": True}
+
+    @app.post("/api/inject")
+    async def api_inject(label: str = Form(...), file: UploadFile = File(...)) -> dict:
+        """Inject a pre-labeled image as a 'user' sample (bypasses camera+UI).
+
+        Used by the offline label feeder (`tools/feed_labels.py`) to drive
+        federated-learning rounds from the training dataset without needing
+        the iPad UI or a real PIR trigger.
+        """
+        if inject_sample is None:
+            raise HTTPException(status_code=503, detail="inject not wired")
+        if label not in valid_labels:
+            raise HTTPException(
+                status_code=400,
+                detail=f"invalid label, must be one of {valid_labels}",
+            )
+        data = await file.read()
+        if not data:
+            raise HTTPException(status_code=400, detail="empty file")
+        arr = np.frombuffer(data, dtype=np.uint8)
+        frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        if frame is None:
+            raise HTTPException(status_code=400, detail="cannot decode image")
+        sample_id = inject_sample(frame, label)
+        return {"ok": True, "sample_id": sample_id, "label": label}
 
     return app

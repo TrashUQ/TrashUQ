@@ -14,6 +14,7 @@ class Config:
 
     # Camera
     camera_index: int = 0
+    fake_camera: bool = False  # generate synthetic frames instead of reading V4L2
     capture_width: int = 1280
     capture_height: int = 720
     capture_fps: int = 30
@@ -35,6 +36,7 @@ class Config:
     label_timeout_s: float = 120.0
 
     # Serial (MPU ↔ MCU)
+    mcu_enabled: bool = True
     serial_port: str = "/dev/ttyUSB0"
     serial_baud: int = 115200
     serial_timeout_s: float = 2.0
@@ -54,9 +56,10 @@ class Config:
     fl_port: int = 50051
     # Fine-tune trigger: run a fine-tune round after this many new user labels
     fl_trigger_user_samples: int = 10
-    fl_epochs: int = 3
+    # Tuned for the small NumPy calibration head (n_classes² + n_classes params)
+    fl_epochs: int = 25
     fl_batch_size: int = 8
-    fl_learning_rate: float = 1e-4
+    fl_learning_rate: float = 0.2
 
     # Which material this bin accepts (set at deploy time)
     bin_class: str = "paper"

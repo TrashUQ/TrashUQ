@@ -227,3 +227,9 @@ init.md
 model/trashnet/data/dataset-resized/
 # Training outputs
 model/output/
+# Claude Code local state
+.claude/
+
+# Benchmark run artifacts (generated locally, not source of truth)
+benchmarks/_workdir/
+benchmarks/results/

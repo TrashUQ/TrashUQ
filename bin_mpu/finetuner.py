@@ -1,20 +1,21 @@
 """
-On-device fine-tuning.
+On-device fine-tuning — NumPy only, no TensorFlow required.
 
-Approach (keeps the on-bin compute footprint small):
-  1. Load MobileNetV2 base (ImageNet weights, no top) once.
-  2. Maintain a small Keras "head" mirroring the trained head:
-        GlobalAvgPool → Dropout → Dense(128, relu) → Dropout → Dense(N_CLASSES, softmax)
-     The head's trainable parameters are what we fine-tune locally and what we
-     ship to the FL coordinator.
-  3. Pull user-labeled samples from the local SQLite store, extract features
-     through the frozen base (once per image, cached), and fit the head for a
-     few epochs at a small learning rate.
-  4. Re-export TFLite so the inference pipeline picks up the new weights at
-     next process restart (or via Classifier.reload()).
+Why this design:
+  Running a full Keras/TF training loop on the UNO Q MPU (ARM, modest CPU) is
+  heavy and fragile. Instead we freeze the TFLite base model and train a tiny
+  *calibration head* on top of its class probabilities:
 
-This module is only imported when --fl is enabled; it depends on `tensorflow`
-which is only present on dev machines / the MPU with the `train` extra installed.
+        q = softmax(W · p + b)
+
+  where `p` is the base model's probability vector and `W` (n×n) + `b` (n) are
+  the only trainable parameters — n_classes² + n_classes floats total
+  (20 floats for the 4-class model). This is what the federated-learning loop
+  exchanges with the coordinator.
+
+Training data is the set of user-labeled samples in the local SQLite store
+(`label_src = 'user'`). Each image is run once through the frozen TFLite model
+to get `p`; the head is then trained with plain SGD + cross-entropy.
 """
 from __future__ import annotations
 
@@ -22,102 +23,38 @@ import logging
 import sqlite3
 import threading
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import numpy as np
 
+from .classifier import Classifier, _softmax
 from .config import Config
-
-if TYPE_CHECKING:  # avoid importing TF at module load when FL is off
-    import tensorflow as tf  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
 
-def _read_image(path: Path, img_size: int) -> np.ndarray | None:
+def _read_image(path: Path):
     import cv2
-    img = cv2.imread(str(path))
-    if img is None:
-        return None
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    img = cv2.resize(img, (img_size, img_size))
-    arr = img.astype(np.float32)
-    return (arr / 127.5) - 1.0  # MobileNetV2 preprocess
+    return cv2.imread(str(path))
 
 
 class FineTuner:
-    """Train the classification head on locally collected user-labeled samples."""
+    """Trains the Classifier's calibration head on locally collected user labels."""
 
-    IMG_SIZE = 224
-
-    def __init__(self, cfg: Config) -> None:
+    def __init__(self, cfg: Config, classifier: Classifier) -> None:
         self._cfg = cfg
+        self._clf = classifier
         self._labels = cfg.labels
+        self._n = len(cfg.labels)
         self._lock = threading.Lock()
-        self._base = None
-        self._head = None
+        # Start from the classifier's current calibration (identity by default)
+        self._w, self._b = classifier.get_calibration()
 
-    # ── lazy init (TF is heavy) ──────────────────────────────────────────────
-    def _ensure_built(self) -> None:
-        if self._head is not None:
-            return
-        import tensorflow as tf
+    # ── data ─────────────────────────────────────────────────────────────────
+    def _load_features(self) -> tuple[np.ndarray, np.ndarray]:
+        """Run every user-labeled image through the frozen base model once.
 
-        logger.info("Building fine-tuner head (TF=%s)", tf.__version__)
-        self._base = tf.keras.applications.MobileNetV2(
-            input_shape=(self.IMG_SIZE, self.IMG_SIZE, 3),
-            include_top=False,
-            weights="imagenet",
-            pooling="avg",
-        )
-        self._base.trainable = False
-
-        if self._cfg.saved_model_path.exists():
-            try:
-                full = tf.keras.models.load_model(
-                    str(self._cfg.saved_model_path.parent / "best_model.keras")
-                )
-                head_inputs = tf.keras.Input(shape=self._base.output_shape[1:])
-                x = head_inputs
-                # Re-create the head architecture and copy weights from layers 3..end
-                # of the full model (everything after MobileNetV2 + GAP).
-                # If layout differs we just fall through to a fresh head.
-                x = tf.keras.layers.Dropout(0.3)(x)
-                x = tf.keras.layers.Dense(128, activation="relu", name="dense_128")(x)
-                x = tf.keras.layers.Dropout(0.2)(x)
-                outputs = tf.keras.layers.Dense(
-                    len(self._labels), activation="softmax", name="predictions"
-                )(x)
-                head = tf.keras.Model(head_inputs, outputs, name="head")
-                # Copy weights for the named dense layers
-                for name in ("dense_128", "predictions"):
-                    try:
-                        head.get_layer(name).set_weights(full.get_layer(name).get_weights())
-                    except (ValueError, KeyError):
-                        logger.warning("Could not copy weights for layer %s", name)
-                self._head = head
-                logger.info("Loaded head weights from %s", self._cfg.saved_model_path)
-            except Exception:
-                logger.exception("Falling back to fresh head — could not load saved model")
-
-        if self._head is None:
-            head_inputs = tf.keras.Input(shape=self._base.output_shape[1:])
-            x = tf.keras.layers.Dropout(0.3)(head_inputs)
-            x = tf.keras.layers.Dense(128, activation="relu", name="dense_128")(x)
-            x = tf.keras.layers.Dropout(0.2)(x)
-            outputs = tf.keras.layers.Dense(
-                len(self._labels), activation="softmax", name="predictions"
-            )(x)
-            self._head = tf.keras.Model(head_inputs, outputs, name="head")
-
-        self._head.compile(
-            optimizer=tf.keras.optimizers.Adam(self._cfg.fl_learning_rate),
-            loss="sparse_categorical_crossentropy",
-            metrics=["accuracy"],
-        )
-
-    # ── data loading ─────────────────────────────────────────────────────────
-    def _load_user_samples(self) -> tuple[np.ndarray, np.ndarray]:
+        Returns (P, y): P is (N, n) base probabilities, y is (N,) label indices.
+        """
         conn = sqlite3.connect(str(self._cfg.db_path))
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
@@ -125,98 +62,109 @@ class FineTuner:
         ).fetchall()
         conn.close()
 
-        xs: list[np.ndarray] = []
+        feats: list[np.ndarray] = []
         ys: list[int] = []
         for row in rows:
             if row["label"] not in self._labels:
                 continue
-            img = _read_image(Path(row["image_path"]), self.IMG_SIZE)
+            img = _read_image(Path(row["image_path"]))
             if img is None:
                 continue
-            xs.append(img)
+            feats.append(self._clf.predict_proba(img))
             ys.append(self._labels.index(row["label"]))
 
-        if not xs:
-            return np.empty((0, self.IMG_SIZE, self.IMG_SIZE, 3), dtype=np.float32), np.empty(0, dtype=np.int64)
-        return np.stack(xs), np.array(ys, dtype=np.int64)
+        if not feats:
+            return np.empty((0, self._n), dtype=np.float32), np.empty(0, dtype=np.int64)
+        return np.stack(feats), np.array(ys, dtype=np.int64)
 
-    # ── public API ───────────────────────────────────────────────────────────
     def num_user_samples(self) -> int:
         conn = sqlite3.connect(str(self._cfg.db_path))
         n = conn.execute("SELECT COUNT(*) FROM samples WHERE label_src = 'user'").fetchone()[0]
         conn.close()
         return int(n)
 
+    # ── training ─────────────────────────────────────────────────────────────
     def run_round(self) -> dict | None:
-        """Train one fine-tuning round. Returns metrics+weights dict on success, None on no-op."""
+        """Train the calibration head one round. Returns metrics+weights, or None."""
         with self._lock:
-            self._ensure_built()
-            assert self._head is not None and self._base is not None
-
-            xs, ys = self._load_user_samples()
-            if len(xs) < 2:
-                logger.info("FineTuner: not enough user samples (%d), skipping round", len(xs))
+            P, y = self._load_features()
+            if len(P) < 2:
+                logger.info("FineTuner: not enough user samples (%d), skipping", len(P))
                 return None
 
-            logger.info("FineTuner: extracting features for %d samples", len(xs))
-            feats = self._base.predict(xs, verbose=0, batch_size=self._cfg.fl_batch_size)
+            w = self._w.astype(np.float64).copy()
+            b = self._b.astype(np.float64).copy()
+            lr = self._cfg.fl_learning_rate
+            n_epochs = self._cfg.fl_epochs
+            batch = max(1, self._cfg.fl_batch_size)
+            rng = np.random.default_rng(0)
 
-            logger.info("FineTuner: training head for %d epochs", self._cfg.fl_epochs)
-            history = self._head.fit(
-                feats, ys,
-                epochs=self._cfg.fl_epochs,
-                batch_size=self._cfg.fl_batch_size,
-                verbose=0,
-                shuffle=True,
-            )
+            final_loss = 0.0
+            for _ in range(n_epochs):
+                order = rng.permutation(len(P))
+                for start in range(0, len(P), batch):
+                    idx = order[start : start + batch]
+                    pb, yb = P[idx], y[idx]
+                    # Forward
+                    logits = pb @ w.T + b               # (B, n)
+                    q = np.apply_along_axis(_softmax, 1, logits)
+                    # Cross-entropy gradient
+                    onehot = np.eye(self._n)[yb]
+                    dlogits = (q - onehot) / len(idx)    # (B, n)
+                    dw = dlogits.T @ pb                  # (n, n)
+                    db = dlogits.sum(axis=0)             # (n,)
+                    w -= lr * dw
+                    b -= lr * db
 
-            final_loss = float(history.history["loss"][-1])
-            final_acc = float(history.history["accuracy"][-1])
+            # Final epoch metrics over the full set
+            logits = P @ w.T + b
+            q = np.apply_along_axis(_softmax, 1, logits)
+            eps = 1e-9
+            final_loss = float(-np.mean(np.log(q[np.arange(len(y)), y] + eps)))
+            final_acc = float(np.mean(np.argmax(q, axis=1) == y))
 
-            weights = self._flatten_head_weights()
+            self._w = w.astype(np.float32)
+            self._b = b.astype(np.float32)
+            # Install the freshly trained head so inference uses it immediately
+            self._clf.set_calibration(self._w, self._b)
+
+            weights = self._flatten()
             logger.info(
-                "FineTuner: round done — loss=%.4f acc=%.3f weights_len=%d",
-                final_loss, final_acc, len(weights),
+                "FineTuner: round done — n=%d loss=%.4f acc=%.3f weights=%d",
+                len(P), final_loss, final_acc, len(weights),
             )
             return {
-                "num_samples": int(len(xs)),
+                "num_samples": int(len(P)),
                 "local_weights": weights,
                 "local_loss": final_loss,
                 "local_accuracy": final_acc,
             }
 
-    def apply_global_weights(self, weights: list[float]) -> None:
-        """Apply a flat float vector received from the FL coordinator back into the head."""
-        with self._lock:
-            self._ensure_built()
-            assert self._head is not None
-            shapes = [w.shape for w in self._head.get_weights()]
-            sizes = [int(np.prod(s)) for s in shapes]
-            total = sum(sizes)
-            if len(weights) != total:
-                logger.warning(
-                    "Global weight length %d != local %d — skipping apply",
-                    len(weights), total,
-                )
-                return
-            new_weights = []
-            offset = 0
-            for shape, size in zip(shapes, sizes):
-                chunk = np.array(weights[offset : offset + size], dtype=np.float32).reshape(shape)
-                new_weights.append(chunk)
-                offset += size
-            self._head.set_weights(new_weights)
-            logger.info("Applied global head weights (%d floats)", total)
-
+    # ── FL weight exchange ───────────────────────────────────────────────────
     def head_weight_length(self) -> int:
-        with self._lock:
-            self._ensure_built()
-            assert self._head is not None
-            return int(sum(int(np.prod(w.shape)) for w in self._head.get_weights()))
+        return self._n * self._n + self._n
 
-    def _flatten_head_weights(self) -> list[float]:
-        assert self._head is not None
-        out: list[float] = []
-        for w in self._head.get_weights():
-            out.extend(w.flatten().tolist())
-        return out
+    def _flatten(self) -> list[float]:
+        return self._w.flatten().tolist() + self._b.flatten().tolist()
+
+    def apply_global_weights(self, weights: list[float]) -> None:
+        """Install an aggregated calibration head received from the coordinator."""
+        expected = self.head_weight_length()
+        if len(weights) != expected:
+            logger.warning(
+                "Global weight length %d != expected %d — skipping apply",
+                len(weights), expected,
+            )
+            return
+        flat = np.asarray(weights, dtype=np.float32)
+        # The coordinator initialises its global model to all-zeros. A zero W
+        # makes softmax(W·p + b) uniform and destroys the classifier, so treat
+        # an all-zero vector as "no global model yet" and keep the local head.
+        if not np.any(flat):
+            logger.info("Global weights are all-zero (no aggregated model yet) — keeping local head")
+            return
+        with self._lock:
+            self._w = flat[: self._n * self._n].reshape(self._n, self._n)
+            self._b = flat[self._n * self._n :].reshape(self._n)
+            self._clf.set_calibration(self._w, self._b)
+        logger.info("Applied global calibration head (%d floats)", expected)

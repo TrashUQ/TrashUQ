@@ -36,11 +36,20 @@ class MCULink:
         self._event_callbacks: list[Callable[[str], None]] = []
 
     def connect(self) -> None:
-        self._ser = serial.Serial(
-            self._cfg.serial_port,
-            self._cfg.serial_baud,
-            timeout=self._cfg.serial_timeout_s,
-        )
+        if not self._cfg.mcu_enabled:
+            logger.info("MCU disabled (--no-mcu); commands will be logged only")
+            return
+        try:
+            self._ser = serial.Serial(
+                self._cfg.serial_port,
+                self._cfg.serial_baud,
+                timeout=self._cfg.serial_timeout_s,
+            )
+        except (serial.SerialException, OSError) as exc:
+            logger.warning("MCU serial open failed on %s: %s — running in stub mode",
+                           self._cfg.serial_port, exc)
+            self._ser = None
+            return
         logger.info("MCU serial connected on %s", self._cfg.serial_port)
         t = threading.Thread(target=self._read_loop, daemon=True)
         t.start()
@@ -54,7 +63,7 @@ class MCULink:
 
     def send(self, cmd: str) -> None:
         if not self._ser or not self._ser.is_open:
-            logger.warning("Serial not open, dropping command: %s", cmd)
+            logger.debug("MCU stub: %s", cmd)
             return
         with self._lock:
             self._ser.write((cmd + "\n").encode())

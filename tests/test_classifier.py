@@ -33,8 +33,11 @@ def labels() -> list[str]:
 
 
 def _make_classifier(labels: list[str], logits: list[float]) -> Classifier:
+    import threading
+
     clf = object.__new__(Classifier)
     clf._labels = labels
+    clf._n = len(labels)
     clf._interpreter = FakeInterpreter(logits)
     clf._input_idx = 0
     clf._input_shape = np.array([1, 224, 224, 3])
@@ -42,6 +45,10 @@ def _make_classifier(labels: list[str], logits: list[float]) -> Classifier:
     clf._output_idx = 0
     clf._input_h = 224
     clf._input_w = 224
+    clf._cal_lock = threading.Lock()
+    clf._cal_w = np.eye(len(labels), dtype=np.float32)
+    clf._cal_b = np.zeros(len(labels), dtype=np.float32)
+    clf._cal_active = False
     return clf
 
 

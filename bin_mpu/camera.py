@@ -14,8 +14,16 @@ class Camera:
     def __init__(self, cfg: Config) -> None:
         self._cfg = cfg
         self._cap: cv2.VideoCapture | None = None
+        self._fake = cfg.fake_camera
+        self._rng = np.random.default_rng(0)
 
     def open(self) -> None:
+        if self._fake:
+            logger.warning(
+                "FAKE CAMERA enabled — generating synthetic %dx%d frames",
+                self._cfg.capture_width, self._cfg.capture_height,
+            )
+            return
         cap = cv2.VideoCapture(self._cfg.camera_index, cv2.CAP_V4L2)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, self._cfg.capture_width)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self._cfg.capture_height)
@@ -31,11 +39,24 @@ class Camera:
         if self._cap:
             self._cap.release()
 
+    def _fake_frame(self) -> np.ndarray:
+        return self._rng.integers(
+            0, 256, (self._cfg.capture_height, self._cfg.capture_width, 3), dtype=np.uint8
+        )
+
     def capture_burst(self) -> list[np.ndarray]:
         """Capture burst_frames frames at burst_interval_s intervals.
 
         Returns list of BGR frames. Raises RuntimeError if any frame fails.
         """
+        if self._fake:
+            frames = []
+            for i in range(self._cfg.burst_frames):
+                if i > 0:
+                    time.sleep(self._cfg.burst_interval_s)
+                frames.append(self._fake_frame())
+            return frames
+
         if not self._cap or not self._cap.isOpened():
             raise RuntimeError("Camera not open")
 

@@ -106,6 +106,34 @@ class MqttTelemetry:
             "timestamp": int(time.time() * 1000),
         })
 
+    def publish_metrics(
+        self,
+        local_loss: float,
+        local_accuracy: float,
+        global_loss: float | None = None,
+        global_accuracy: float | None = None,
+        online_clients: int = 1,
+        round_number: int | None = None,
+        model_version: int | None = None,
+    ) -> None:
+        """Publish an FL training round's metrics for the dashboard charts."""
+        # For a single-bin deployment the aggregated global == local.
+        gl = global_loss if global_loss is not None else local_loss
+        ga = global_accuracy if global_accuracy is not None else local_accuracy
+        self._publish("metrics", {
+            "device_id": self._cfg.device_id,
+            "localLoss": local_loss,
+            "localAccuracy": local_accuracy,
+            "loss": local_loss,
+            "accuracy": local_accuracy,
+            "globalLoss": gl,
+            "globalAccuracy": ga,
+            "onlineClients": online_clients,
+            "round": round_number,
+            "modelVersion": model_version,
+            "timestamp": int(time.time() * 1000),
+        })
+
     def publish_help_request(self, sample_id: str, model_guess: str, confidence: float) -> None:
         self._publish("help", {
             "device_id": self._cfg.device_id,

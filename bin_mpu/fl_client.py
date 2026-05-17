@@ -119,6 +119,14 @@ class FLClient:
                 local_loss=result["local_loss"],
                 local_accuracy=result["local_accuracy"],
             )
+            # Feeds the dashboard's loss/accuracy charts
+            self._telemetry.publish_metrics(
+                local_loss=result["local_loss"],
+                local_accuracy=result["local_accuracy"],
+                online_clients=1,
+                round_number=self._current_round,
+                model_version=self._model_version,
+            )
 
         # Submit
         try:
