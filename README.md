@@ -652,4 +652,4 @@ This repository represents a research prototype validated through a deployed two
 
 Developed as part of the TrashUQ Edge AI + Federated Learning project.
 
-The current edge repository includes an Apache 2.0 license file. A top-level unified project license should be finalized when the repositories are merged.
+The current edge repository includes an Mozilla Public License 2.0 license file. A top-level unified project license should be finalized when the repositories are merged.
