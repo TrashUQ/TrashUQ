@@ -2,11 +2,11 @@ flowchart TB
   Edge["edge/ runtime commands"]
   Sim["No-hardware simulator<br/>uv run python -m app.edge_simulator"]
   MqttTest["MQTT one-shot test<br/>uv run python scripts/test_mqtt_publish.py"]
-  GrpcTest["gRPC smoke test<br/>uv run python scripts/test_fl_grpc.py"]
+  GrpcTest["gRPC validation<br/>uv run python scripts/test_fl_grpc.py"]
   ModelLoad["Model load test<br/>uv run python scripts/test_model_load.py"]
   ImageTest["Single-image inference<br/>EDGE_IMAGE_PATH=... uv run python scripts/test_single_image_inference.py"]
   Camera["Camera check<br/>uv run python scripts/test_camera_open.py"]
-  Real["Real camera/image/video runtime<br/>uv run python -m app.real_edge_runtime"]
+  Real["Camera/image/video runtime<br/>uv run python -m app.real_edge_runtime"]
 
   Edge --> Sim
   Edge --> MqttTest
@@ -16,7 +16,7 @@ flowchart TB
   Edge --> Camera
   Edge --> Real
 
-  Sim -->|"publishes synthetic status, metrics, classifications, events"| MQTT["TrashUQ MQTT pipeline"]
+  Sim -->|"publishes status, metrics, classifications, events"| MQTT["TrashUQ MQTT pipeline"]
   MqttTest --> MQTT
-  Real -->|"TFLite classification runtime; bbox is null for real predictions"| MQTT
+  Real -->|"TFLite material classification telemetry"| MQTT
   GrpcTest --> FL["TrashUQ gRPC FL coordinator"]

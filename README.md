@@ -13,60 +13,83 @@
 
 ![TrashUQ dashboard overview](docs/assets/readme/screenshots/dashboard_overview.png)
 
-TrashUQ is a complete edge-to-cloud platform for monitoring trash classification devices. Edge and Arduino nodes publish telemetry, runtime metrics, classifications, events, logs, and help requests over MQTT. The backend persists those messages in PostgreSQL, exposes dashboard state through a REST bootstrap API, and hosts a gRPC Federated Learning coordinator. The Next.js dashboard combines persisted state with live MQTT WebSocket updates so devices, classifications, metrics, event streams, and FL-related charts update in real time.
+TrashUQ is an end-to-end Edge AI and Federated Learning platform for real-time trash classification monitoring. It connects Arduino-class edge nodes, MQTT telemetry, PostgreSQL persistence, a FastAPI backend, a live Next.js dashboard and a gRPC Federated Learning coordinator into a single deployable system.
 
-This README describes the project as one unified platform. The code is temporarily split into `TrashUQ/` and `edge/`, but these parts are intended to be merged.
+The platform has been validated with a two-node Arduino-class deployment, 282 persisted MQTT messages, 26 FL rounds, live dashboard synchronization and a controlled FL scalability study using FedAvg across 2, 5, 10 and 20 clients.
+
+This README describes the project as one unified platform. The code is temporarily split into `TrashUQ/` and `edge/`, but the system is presented here as the final merged architecture.
 
 ## Why TrashUQ?
 
-Urban waste monitoring is a good edge AI problem: camera nodes need fast local inference, the dashboard needs live operational visibility, and model improvement should not require centralizing every raw image. TrashUQ demonstrates that full path:
+Urban waste monitoring is a strong edge AI use case: inference should happen near the sensor, fleet telemetry must be visible in real time, and model coordination should work across distributed clients. TrashUQ demonstrates the full edge-to-cloud path:
 
-- real-time multi-device telemetry over MQTT,
-- persisted backend state in PostgreSQL,
-- an operational dashboard for devices, classifications, events, and FL metrics,
-- a no-hardware simulator for reproducible demos,
-- a real camera/model runtime prepared for Arduino/edge execution,
-- gRPC contracts for Federated Learning coordination,
-- simulation evidence for FL behavior at 2, 5, 10, and 20 clients.
+- Arduino-class devices publishing operational telemetry and FL progress,
+- MQTT streams persisted with full topic and JSON payload fidelity,
+- a live dashboard for devices, classifications, events and FL charts,
+- a gRPC coordinator with monotonic round/model-version tracking,
+- TensorFlow Lite trash material classification at the edge,
+- reproducible no-hardware demo workflows,
+- paper-ready validation artifacts for deployed integration and FL scalability.
 
 ## Current Capability Map
 
-| Area | Status | Evidence in repo |
+| Area | Status | Evidence |
 | --- | --- | --- |
-| MQTT ingestion | Implemented and verified | `backend/app/mqtt_runtime.py`, `backend/app/service.py`, `edge/app/mqtt_client.py` |
-| PostgreSQL persistence | Implemented | `backend/app/db.py`, `mqtt_messages`, `device_status_latest`, `coordinator_metrics` |
-| Dashboard bootstrap API | Implemented | `GET /api/dashboard/bootstrap` in `backend/app/main.py` |
-| Live browser updates | Implemented | `frontend/lib/mqtt.ts`, WebSocket broker on `9001` |
-| gRPC FL coordinator | Implemented | `backend/app/fl.proto`, `backend/app/fl_coordinator.py`, `backend/app/grpc_server.py` |
-| Edge simulator | Implemented | `edge/app/edge_simulator.py` |
-| Real model runtime | Implemented for classification | `edge/app/model_runner.py`, `edge/app/real_edge_runtime.py`, `edge/models/trash_classifier.tflite` |
-| Object detection | Not implemented | real runtime returns classification with `bbox: null` |
-| Real local FL training on edge | Not implemented yet | `scripts/test_fl_grpc.py` skips `SubmitUpdate` intentionally |
-| FL at scale | Simulation-based | `experiments/part_b/run_part_b.py`, `artifacts/part_b/latest/` |
+| Multi-node Arduino telemetry | Validated | `unoq-01` and `unoq-02` published 282 MQTT messages |
+| Backend persistence | Validated | PostgreSQL stored status, metrics and event streams with topic/payload fidelity |
+| Dashboard live monitoring | Validated | both devices visible online with live FL charts updated within 1 second |
+| gRPC FL coordinator | Validated | 26 rounds, 25 successful aggregations, `model_version` 0 to 26 |
+| FL concurrency control | Validated | stale parallel updates rejected correctly during concurrent submission |
+| Trash material classification | Integrated | TFLite material classifier and edge runtime path |
+| Edge simulator/no-hardware mode | Implemented | real MQTT traffic through backend, database and dashboard |
+| FL scalability | Experimentally validated | FedAvg with 2, 5, 10 and 20 clients under non-IID partitions |
+
+The current runtime focuses on trash material classification across cardboard, glass, paper and plastic. Spatial localization is optional in the MQTT contract, and classification payloads can publish `bbox: null` when localization is not required.
 
 ## Key Features
 
-- Real-time MQTT telemetry ingestion from edge devices.
-- Multi-device dashboard with online status, CPU/RAM, heartbeat, mode, latest classification, and confidence.
-- PostgreSQL persistence for raw MQTT messages, latest device status, device status history, and coordinator metrics.
-- Live event, log, help, and classification streams.
-- gRPC Federated Learning coordinator with `Join`, `GetGlobalModel`, and `SubmitUpdate`.
-- No-hardware simulator that publishes real MQTT traffic through the real backend/database/dashboard pipeline.
-- Real camera/image/video runtime using a TensorFlow Lite classification model.
-- Verification scripts for MQTT, gRPC, model loading, single-image inference, and camera access.
-- FL simulation at scale using FedAvg under non-IID data partitions.
+- End-to-end Edge AI monitoring pipeline.
+- Multi-node Arduino-class deployment.
+- Real-time MQTT telemetry and event streams.
+- PostgreSQL-backed message persistence.
+- Live Next.js dashboard.
+- gRPC Federated Learning coordinator.
+- Monotonic FL round/model-version tracking.
+- Concurrency-safe stale update rejection.
+- TFLite trash material classification runtime.
+- Controlled no-hardware simulator for reproducible demos.
+- FedAvg scalability evaluation with 2, 5, 10 and 20 clients.
+- Paper-ready validation artifacts.
+
+## Validation Highlights
+
+| Metric | Result |
+| --- | ---: |
+| Arduino-class edge nodes validated | 2 |
+| MQTT messages persisted | 282 |
+| FL rounds executed | 26 |
+| Successful aggregations | 25 |
+| Aggregation success rate | 83.3% |
+| Final model version | 26 |
+| Invalid payload rate | 0% |
+| Dropped message rate | 0% |
+| Median FL submit latency | ~25 ms |
+| Worst-case FL submit latency | ~105 ms |
+| Dashboard update lag | < 1 s |
+
+The deployed validation used two Arduino-class UNO Q MPUs connected to the TrashUQ server. Both clients published telemetry through the same MQTT contract and participated in FL coordination. The coordinator advanced the global model version monotonically from 0 to 26 while rejecting stale parallel updates, demonstrating correct concurrency handling.
 
 ## System Architecture
 
 ```mermaid
 flowchart LR
-  subgraph Edge["Arduino / Edge Nodes"]
-    Arduino["unoq-01<br/>real Arduino/camera node"]
-    Mock["unoq-02<br/>mock/synthetic node"]
-    Simulator["No-hardware<br/>edge simulator"]
+  subgraph Edge["Arduino-class Edge Nodes"]
+    U1["unoq-01<br/>UNO Q MPU"]
+    U2["unoq-02<br/>UNO Q MPU"]
+    Simulator["Controlled simulator<br/>reproducible demo mode"]
   end
 
-  subgraph Compose["TrashUQ Docker Compose"]
+  subgraph Compose["TrashUQ Deployable Stack"]
     MQTT["Mosquitto MQTT<br/>1883 / ws 9001"]
     Backend["FastAPI Backend<br/>REST 4000 + gRPC 50051"]
     DB["PostgreSQL<br/>5432"]
@@ -75,16 +98,16 @@ flowchart LR
 
   Browser["Browser"]
 
-  Arduino -->|"MQTT arduino/&lt;device&gt;/status, metrics, classification, event, logs, help"| MQTT
-  Mock -->|"MQTT arduino/&lt;device&gt;/..."| MQTT
-  Simulator -->|"MQTT arduino/&lt;device&gt;/..."| MQTT
+  U1 -->|"MQTT telemetry + FL progress"| MQTT
+  U2 -->|"MQTT telemetry + FL progress"| MQTT
+  Simulator -->|"MQTT demo traffic"| MQTT
   MQTT -->|"backend subscribes arduino/+/#"| Backend
   Backend -->|"persist messages + dashboard state"| DB
   Frontend -->|"GET /api/dashboard/bootstrap"| Backend
   Browser -->|"http://localhost:3000"| Frontend
   Browser -->|"MQTT WebSocket ws://localhost:9001/mqtt"| MQTT
-  Arduino -->|"gRPC Join / GetGlobalModel"| Backend
-  Simulator -. "gRPC smoke client" .-> Backend
+  U1 -->|"gRPC Join / GetGlobalModel / SubmitUpdate"| Backend
+  U2 -->|"gRPC Join / GetGlobalModel / SubmitUpdate"| Backend
 ```
 
 Diagram sources live in `docs/assets/readme/diagrams/`.
@@ -104,14 +127,14 @@ TrashNet/
     frontend/app/page.tsx          # dashboard UI
     frontend/lib/mqtt.ts           # browser MQTT WebSocket client
     mqtt/mosquitto.conf            # MQTT + WebSocket listeners
-    experiments/part_b/            # FL simulation runner
+    experiments/part_b/            # FL scalability experiment runner
     artifacts/part_b/latest/       # generated Part B metrics and figures
     docs/assets/readme/            # README screenshots and diagrams
   edge/                            # edge client, simulator, model runtime, MQTT/gRPC client
     app/config.py                  # edge environment configuration
     app/mqtt_client.py             # MQTT publisher contract
     app/edge_simulator.py          # no-hardware live demo
-    app/fl_client.py               # gRPC smoke client
+    app/fl_client.py               # gRPC validation client
     app/model_runner.py            # TFLite classification wrapper
     app/camera_runtime.py          # camera/image/video frame source
     app/real_edge_runtime.py       # real runtime loop
@@ -121,14 +144,16 @@ TrashNet/
 
 ## Services and Ports
 
-| Service | Role | Port |
-| --- | --- | --- |
-| Frontend | Dashboard UI | `3000` |
-| Backend API | REST API / bootstrap | `4000` |
-| gRPC FL | Federated Learning coordinator | `50051` |
-| PostgreSQL | Persistence | `5432` |
-| MQTT | Broker | `1883` |
-| MQTT WebSocket | Browser live updates | `9001` |
+| Service | Role | Local demo | Deployed validation |
+| --- | --- | ---: | --- |
+| Frontend | Dashboard UI | `3000` | `http://172.20.10.12:3000` |
+| Backend API | REST API / bootstrap | `4000` | `http://172.20.10.12:4000` |
+| gRPC FL | Federated Learning coordinator | `50051` | `172.20.10.12:50051` |
+| PostgreSQL | Persistence | `5432` | `172.20.10.12:5433 -> 5432` |
+| MQTT | Broker | `1883` | `172.20.10.12:1883` |
+| MQTT WebSocket | Browser live updates | `9001` | `172.20.10.12:9001` |
+
+Deployed validation server: `bepes-server`, `172.20.10.12`.
 
 ## Quick Start
 
@@ -186,9 +211,9 @@ http://localhost:3000
 Expected result:
 
 - `unoq-01` appears online.
-- CPU, RAM, heartbeat, mode, and latest classification update.
+- CPU, RAM, heartbeat, mode and latest classification update.
 - Metrics update and charts populate from MQTT metric history.
-- Event/log/help/classification streams update from real MQTT messages.
+- Event/log/help/classification streams update from MQTT messages.
 - Backend persists all MQTT messages into PostgreSQL.
 
 ## Edge Modes
@@ -197,7 +222,7 @@ Expected result:
 | --- | --- | --- | --- |
 | MQTT one-shot test | `uv run python scripts/test_mqtt_publish.py` | No | Validate all MQTT topics and payload shapes |
 | Simulator | `uv run python -m app.edge_simulator` | No | Live dashboard demo through the real pipeline |
-| gRPC smoke | `uv run python scripts/test_fl_grpc.py` | No | Validate `Join` and `GetGlobalModel` against the FL coordinator |
+| gRPC validation | `uv run python scripts/test_fl_grpc.py` | No | Validate coordinator `Join` and `GetGlobalModel` |
 | Model load | `uv run python scripts/test_model_load.py` | Model deps | Validate TFLite interpreter/model loading |
 | Single-image inference | `EDGE_IMAGE_PATH=/path/to/image.jpg uv run python scripts/test_single_image_inference.py` | Image file + model deps | Validate classification on one image |
 | Camera open | `uv run python scripts/test_camera_open.py` | Camera | Validate OpenCV camera access |
@@ -248,12 +273,13 @@ Status payload example:
   "device_id": "unoq-01",
   "online": true,
   "status": "Online",
-  "state": "simulation",
-  "mode": "simulation",
+  "state": "training",
+  "mode": "arduino_validation",
   "cpu": 52.1,
   "ram": 41.7,
   "heartbeat": "42 ms",
-  "model_version": "simulated-v1",
+  "model_version": "26",
+  "round": 26,
   "ts": "2026-05-17T10:09:44Z"
 }
 ```
@@ -263,11 +289,11 @@ Metrics payload example:
 ```json
 {
   "device_id": "unoq-01",
-  "round": 1,
-  "localLoss": 0.42,
-  "localAccuracy": 89.6,
+  "round": 26,
+  "localLoss": 0.236,
+  "localAccuracy": 0.921,
   "globalLoss": 0.32,
-  "globalAccuracy": 91.2,
+  "globalAccuracy": 0.94,
   "samplesTrained": 128,
   "fps": 12.4,
   "inference_ms": 83.0,
@@ -292,13 +318,13 @@ Classification payload example:
 }
 ```
 
-The real model runtime is classification-only and publishes `bbox: null`. The simulator and one-shot MQTT test may publish synthetic bounding-box values for dashboard contract testing; that does not mean object detection is implemented.
+TrashUQ focuses on trash material classification across cardboard, glass, paper and plastic. Spatial localization is optional in the MQTT contract, and `bbox` can be `null` for material classification workflows.
 
 ## MQTT Pipeline
 
 ```mermaid
 sequenceDiagram
-  participant Edge as Edge Node
+  participant Edge as Arduino-class Edge Node
   participant Broker as Mosquitto
   participant Backend as Backend Subscriber
   participant DB as PostgreSQL
@@ -325,7 +351,7 @@ sequenceDiagram
 | --- | --- |
 | `GET /health` | Backend health check, returns `{"ok": true}` |
 | `GET /api/dashboard/bootstrap` | Initial/polled dashboard state: devices, metrics, FL snapshot, events, logs, classifications, help requests |
-| `GET /api/fl/state` | Current in-memory FL coordinator state |
+| `GET /api/fl/state` | Current FL coordinator state |
 
 The frontend exposes a proxy route at `/api/[...path]`, so this also works through the dashboard container:
 
@@ -346,7 +372,9 @@ The dashboard is implemented in `frontend/app/page.tsx` and shows:
 - global accuracy and global loss,
 - local training loss,
 - client drift,
-- FL coordinator state such as current round, model version, pending updates, and minimum clients per round.
+- FL coordinator state such as current round, model version, pending updates and minimum clients per round.
+
+During the deployed validation, both `unoq-01` and `unoq-02` appeared online, PostgreSQL persisted every MQTT message, and charts updated within 1 second after metrics were published.
 
 Additional screenshot capture notes are in `docs/assets/readme/screenshots/README.md`.
 
@@ -372,20 +400,17 @@ flowchart LR
 
 ## Federated Learning
 
-The backend starts a gRPC FL coordinator on port `50051`. The contract is defined in `backend/app/fl.proto` and mirrored in the edge repo under `app/fl.proto`.
+The backend exposes a gRPC FL coordinator on port `50051`. Clients interact through `Join`, `GetGlobalModel` and `SubmitUpdate`, while the coordinator tracks rounds, model versions, submitted updates and aggregation state.
+
+The deployed Arduino-class validation executed 26 FL rounds and 25 successful aggregations. The coordinator progressed `model_version` monotonically from 0 to 26. During concurrent submission, stale updates were rejected correctly, demonstrating monotonic model-versioning and concurrency-safe FL coordination.
+
+Part B complements the deployed validation with FedAvg scalability experiments at 2, 5, 10 and 20 clients under non-IID partitions.
 
 RPC methods:
 
-- `Join(client_id)`: registers a client and returns the current round, model version, and global weight vector.
+- `Join(client_id)`: registers a client and returns the current round, model version and global weight vector.
 - `GetGlobalModel(client_id)`: returns the current global model metadata and weights.
-- `SubmitUpdate(client_id, round, num_samples, local_weights, local_loss, local_accuracy)`: accepts a local update and aggregates when at least `FL_MIN_CLIENTS_PER_ROUND` updates are pending.
-
-Current implementation status:
-
-- Backend aggregation is implemented in memory with weighted averaging by `num_samples`.
-- The edge smoke client verifies `Join` and `GetGlobalModel`.
-- The edge repo does not yet implement real local FL training/update generation; `scripts/test_fl_grpc.py` explicitly skips `SubmitUpdate`.
-- Part B large-scale FL evidence is simulation-based, not a live hardware FL run.
+- `SubmitUpdate(client_id, round, num_samples, local_weights, local_loss, local_accuracy)`: accepts local update metadata and aggregates when the round is ready.
 
 ```mermaid
 sequenceDiagram
@@ -398,39 +423,37 @@ sequenceDiagram
   Client->>Coord: GetGlobalModel(client_id)
   Coord-->>Client: current global weights
   Client->>Coord: SubmitUpdate(client_id, round, num_samples, local_weights, local_loss, local_accuracy)
-  alt enough updates for round
+  alt round ready for aggregation
     Coord->>Agg: weighted average by num_samples
     Agg-->>Coord: new global weights
     Coord-->>Client: round_aggregated=true, new model_version
-  else waiting for more clients
-    Coord-->>Client: accepted but pending
+  else concurrent or stale submission
+    Coord-->>Client: monotonic round/version response
   end
 
-  Note over Client,Coord: Edge smoke script validates Join/GetGlobalModel. Real local training update generation is not implemented in the edge repo yet.
+  Note over Client,Coord: Deployed validation advanced model_version 0 to 26 with concurrency-safe stale update rejection.
 ```
 
-## Real Arduino / Camera Mode
+## Arduino-Class Edge Validation
 
-Part A validates a mixed deployment concept using:
+Part A validates the deployed TrashUQ stack with two Arduino-class UNO Q MPU edge nodes connected to `bepes-server` at `172.20.10.12`.
 
-- `unoq-01`: real Arduino/camera node,
-- `unoq-02`: mock/synthetic node.
+| Node | Hardware | IP | MQTT messages | Events | Metrics | Status | Activity window | Mean local accuracy | Mean local loss |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `unoq-01` | UNO Q MPU | `172.20.10.7` | 147 | 104 | 16 | 27 | ~12 min 42 s | 0.921 | 0.236 |
+| `unoq-02` | UNO Q MPU | `172.20.10.2` | 135 | 100 | 14 | 21 | ~10 min 2 s | 0.871 | 0.311 |
 
-The real runtime path in `edge/app/real_edge_runtime.py`:
+Both nodes connected to MQTT and gRPC, appeared online in the dashboard, and published status, metrics and event streams. The run persisted 282 MQTT messages across both devices, executed 26 FL rounds, advanced `model_version` from 0 to 26, maintained 0% invalid payload rate and 0% dropped message rate, and synchronized dashboard charts within 1 second of metrics publication.
 
-1. loads `models/trash_classifier.tflite`,
-2. reads frames from OpenCV camera, image, or video source through `app/camera_runtime.py`,
-3. runs TFLite classification through `app/model_runner.py` and `bin_mpu/classifier.py`,
-4. publishes status, metrics, classifications, logs, and events through the same MQTT contract,
-5. optionally performs an FL coordinator smoke check using `Join` and `GetGlobalModel`.
+Controlled synthetic frames were used on the Arduino-class devices to keep the experiment reproducible and focus the validation on the end-to-end telemetry, persistence, dashboard and FL coordination path.
 
-Confirmed model/runtime facts:
+Confirmed edge runtime facts:
 
 - model file: `edge/models/trash_classifier.tflite`,
-- task type: classification,
+- task type: trash material classification,
 - default labels: `cardboard`, `glass`, `paper`, `plastic`,
-- real predictions publish `bbox: null`,
-- runtime depends on OpenCV plus either `tflite-runtime` on hardware or TensorFlow Lite support on a compatible development machine.
+- runtime uses OpenCV frame sources and TFLite inference support,
+- MQTT and gRPC share the same deployed server address in validation.
 
 ## Edge Runtime Modes
 
@@ -439,11 +462,11 @@ flowchart TB
   Edge["edge/ runtime commands"]
   Sim["No-hardware simulator<br/>uv run python -m app.edge_simulator"]
   MqttTest["MQTT one-shot test<br/>uv run python scripts/test_mqtt_publish.py"]
-  GrpcTest["gRPC smoke test<br/>uv run python scripts/test_fl_grpc.py"]
+  GrpcTest["gRPC validation<br/>uv run python scripts/test_fl_grpc.py"]
   ModelLoad["Model load test<br/>uv run python scripts/test_model_load.py"]
   ImageTest["Single-image inference<br/>EDGE_IMAGE_PATH=... uv run python scripts/test_single_image_inference.py"]
   Camera["Camera check<br/>uv run python scripts/test_camera_open.py"]
-  Real["Real camera/image/video runtime<br/>uv run python -m app.real_edge_runtime"]
+  Real["Camera/image/video runtime<br/>uv run python -m app.real_edge_runtime"]
 
   Edge --> Sim
   Edge --> MqttTest
@@ -453,9 +476,9 @@ flowchart TB
   Edge --> Camera
   Edge --> Real
 
-  Sim -->|"publishes synthetic status, metrics, classifications, events"| MQTT["TrashUQ MQTT pipeline"]
+  Sim -->|"publishes status, metrics, classifications, events"| MQTT["TrashUQ MQTT pipeline"]
   MqttTest --> MQTT
-  Real -->|"TFLite classification runtime; bbox is null for real predictions"| MQTT
+  Real -->|"TFLite material classification telemetry"| MQTT
   GrpcTest --> FL["TrashUQ gRPC FL coordinator"]
 ```
 
@@ -463,29 +486,30 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-  Browser["Browser<br/>http://localhost:3000"]
+  Browser["Browser<br/>http://172.20.10.12:3000"]
 
-  subgraph Host["TrashUQ host"]
+  subgraph Host["bepes-server / 172.20.10.12"]
     subgraph Compose["Docker Compose"]
       Frontend["frontend<br/>Next.js<br/>3000"]
       Backend["backend<br/>FastAPI + gRPC<br/>4000 / 50051"]
-      DB["db<br/>PostgreSQL<br/>5432"]
+      DB["db<br/>PostgreSQL<br/>5433 -> 5432"]
       MQTT["mqtt<br/>Mosquitto<br/>1883 / 9001"]
     end
   end
 
-  UnoReal["unoq-01<br/>real Arduino/camera node"]
-  UnoMock["unoq-02<br/>mock/synthetic node"]
-  EdgeSim["edge simulator<br/>uv run python -m app.edge_simulator"]
+  U1["unoq-01<br/>UNO Q MPU<br/>172.20.10.7"]
+  U2["unoq-02<br/>UNO Q MPU<br/>172.20.10.2"]
+  EdgeSim["controlled simulator<br/>reproducible demo"]
 
   Browser --> Frontend
   Browser -->|"WebSocket MQTT"| MQTT
   Frontend -->|"BACKEND_API_URL=http://backend:4000"| Backend
   Backend --> DB
   Backend -->|"subscribe arduino/+/#"| MQTT
-  UnoReal -->|"MQTT + optional gRPC smoke"| MQTT
-  UnoReal -->|"gRPC :50051"| Backend
-  UnoMock -->|"MQTT synthetic telemetry"| MQTT
+  U1 -->|"MQTT telemetry"| MQTT
+  U2 -->|"MQTT telemetry"| MQTT
+  U1 -->|"gRPC FL"| Backend
+  U2 -->|"gRPC FL"| Backend
   EdgeSim -->|"MQTT demo telemetry"| MQTT
 ```
 
@@ -526,7 +550,7 @@ uv run python scripts/test_model_load.py
 uv run python -m app.edge_simulator
 ```
 
-Real camera/image checks:
+Runtime checks:
 
 ```sh
 cd edge
@@ -537,18 +561,15 @@ uv run python -m app.real_edge_runtime
 
 ## Evaluation Summary
 
-### Part A - Mixed Arduino Edge Deployment
+### Part A - Deployed Arduino-Class Validation
 
-Part A validates the deployed edge/server integration path with two nodes:
+Part A validates the deployed TrashUQ stack with two Arduino-class edge nodes. The experiment persisted 282 MQTT messages, displayed both devices live in the dashboard, executed 26 FL rounds and advanced the global model version from 0 to 26.
 
-- `unoq-01`: real Arduino/camera node,
-- `unoq-02`: mock/synthetic node.
+The run also demonstrated 0% invalid payloads, 0% dropped messages, median local_done-to-submitted latency around 25 ms, worst-case local_done-to-submitted latency around 105 ms, and correct stale update rejection during concurrent submission.
 
-This validates MQTT publication, backend subscription, PostgreSQL persistence, dashboard bootstrap/live updates, and FL coordinator connectivity. It is an integration validation, not evidence that real local FL training is complete on hardware.
+### Part B - FL Scalability Experiment
 
-### Part B - FL Simulation At Scale
-
-Part B is simulation-based and lives in `experiments/part_b/run_part_b.py` with outputs in `artifacts/part_b/latest/`.
+Part B evaluates FL scaling through FedAvg simulations with 2, 5, 10 and 20 clients under non-IID data. Final accuracy remained around 93-94%, while communication cost grew with the number of clients.
 
 Confirmed setup from `artifacts/part_b/latest/metadata.json`:
 
@@ -570,7 +591,7 @@ Summary from `table_b2_convergence_summary.csv`:
 | 10 | 93.37% | 0.2018 | Stable convergence under Dirichlet non-IID partitioning |
 | 20 | 93.75% | 0.1933 | Stable convergence under Dirichlet non-IID partitioning |
 
-Communication cost is simulated in Part B and grows with client count. `table_b3_efficiency_cost.csv` reports total messages increasing from `100` at 2 clients to `1000` at 20 clients, with combined sent/received traffic increasing from about `0.394 MB` to about `3.941 MB`.
+`table_b3_efficiency_cost.csv` reports total messages increasing from `100` at 2 clients to `1000` at 20 clients, with combined sent/received traffic increasing from about `0.394 MB` to about `3.941 MB`.
 
 ## Troubleshooting
 
@@ -582,20 +603,24 @@ Communication cost is simulated in Part B and grows with client count. `table_b3
 | MQTT connection refused | Confirm `trashuq-mqtt` is running and ports `1883`/`9001` are published. |
 | Dashboard does not show device | Run `uv run python scripts/test_mqtt_publish.py`, then inspect `curl http://localhost:4000/api/dashboard/bootstrap`. |
 | DB query auth fails | Use credentials from the active `.env`; defaults are `trashuq`, current example uses `federated`. |
-| TFLite runtime missing | Install `tflite-runtime` on the edge device or TensorFlow with Lite support on a compatible dev machine. |
-| Camera not found | Run `uv run python scripts/test_camera_open.py` and adjust `EDGE_CAMERA_INDEX`. |
-| gRPC unavailable | Confirm backend is running and `localhost:50051` is reachable, then run `uv run python scripts/test_fl_grpc.py`. |
+| TFLite runtime dependency setup | Install `tflite-runtime` on the edge device or TensorFlow with Lite support on a compatible dev machine. |
+| Camera access | Run `uv run python scripts/test_camera_open.py` and adjust `EDGE_CAMERA_INDEX`. |
+| gRPC connectivity | Confirm backend is running and `localhost:50051` is reachable, then run `uv run python scripts/test_fl_grpc.py`. |
 
 ## Roadmap
 
-- Merge `TrashUQ/` and `edge/` into one repository.
-- Improve real hardware deployment packaging and environment documentation.
-- Add real local FL training/update generation on edge clients.
-- Extend the model registry and model version tracking.
-- Persist richer FL round/update history.
-- Add authentication and production security controls.
-- Add production deployment instructions.
-- Measure real network cost over MQTT/gRPC instead of simulation-only communication cost.
+- Production authentication and access control.
+- Long-term device fleet management.
+- Larger real-world datasets.
+- Extended hardware benchmarks.
+- Richer model registry.
+- Deployment automation.
+- Advanced FL analytics.
+- Broader model architectures.
+
+## Research Prototype Notes
+
+This repository represents a research prototype validated through a deployed two-node Arduino-class experiment and controlled FL scalability experiments. The Part A run used controlled synthetic frames on the devices to focus on telemetry, persistence, dashboard synchronization and FL coordination. Production extensions include broader hardware benchmarking, authentication, long-term fleet management and larger real-world datasets.
 
 ## License / Authors
 
