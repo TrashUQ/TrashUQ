@@ -1,0 +1,12 @@
+COMPLETED run_001 clients=2 seed=11 rounds=25/25 final_acc=93.75% final_loss=0.2238 total_time=0.13s
+COMPLETED run_002 clients=2 seed=29 rounds=25/25 final_acc=94.32% final_loss=0.1931 total_time=0.15s
+COMPLETED run_003 clients=2 seed=47 rounds=25/25 final_acc=93.18% final_loss=0.2406 total_time=0.12s
+COMPLETED run_004 clients=5 seed=11 rounds=25/25 final_acc=92.61% final_loss=0.1991 total_time=0.14s
+COMPLETED run_005 clients=5 seed=29 rounds=25/25 final_acc=93.75% final_loss=0.1946 total_time=0.13s
+COMPLETED run_006 clients=5 seed=47 rounds=25/25 final_acc=94.32% final_loss=0.2074 total_time=0.13s
+COMPLETED run_007 clients=10 seed=11 rounds=25/25 final_acc=92.05% final_loss=0.2238 total_time=0.14s
+COMPLETED run_008 clients=10 seed=29 rounds=25/25 final_acc=94.32% final_loss=0.1875 total_time=0.15s
+COMPLETED run_009 clients=10 seed=47 rounds=25/25 final_acc=93.75% final_loss=0.1942 total_time=0.16s
+COMPLETED run_010 clients=20 seed=11 rounds=25/25 final_acc=94.32% final_loss=0.1799 total_time=0.20s
+COMPLETED run_011 clients=20 seed=29 rounds=25/25 final_acc=93.75% final_loss=0.1951 total_time=0.20s
+COMPLETED run_012 clients=20 seed=47 rounds=25/25 final_acc=93.18% final_loss=0.2050 total_time=0.20s

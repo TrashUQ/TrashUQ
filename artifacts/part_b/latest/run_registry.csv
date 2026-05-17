@@ -1,0 +1,13 @@
+run_id,clients,seed,rounds_configured,rounds_completed,alpha,local_epochs,batch_size,learning_rate,status,notes
+run_001,2,11,25,25,0.3,2,16,0.18,PASS,All clients participated every round; sequential single-host simulation.
+run_002,2,29,25,25,0.3,2,16,0.18,PASS,All clients participated every round; sequential single-host simulation.
+run_003,2,47,25,25,0.3,2,16,0.18,PASS,All clients participated every round; sequential single-host simulation.
+run_004,5,11,25,25,0.3,2,16,0.18,PASS,All clients participated every round; sequential single-host simulation.
+run_005,5,29,25,25,0.3,2,16,0.18,PASS,All clients participated every round; sequential single-host simulation.
+run_006,5,47,25,25,0.3,2,16,0.18,PASS,All clients participated every round; sequential single-host simulation.
+run_007,10,11,25,25,0.3,2,16,0.18,PASS,All clients participated every round; sequential single-host simulation.
+run_008,10,29,25,25,0.3,2,16,0.18,PASS,All clients participated every round; sequential single-host simulation.
+run_009,10,47,25,25,0.3,2,16,0.18,PASS,All clients participated every round; sequential single-host simulation.
+run_010,20,11,25,25,0.3,2,16,0.18,PASS,All clients participated every round; sequential single-host simulation.
+run_011,20,29,25,25,0.3,2,16,0.18,PASS,All clients participated every round; sequential single-host simulation.
+run_012,20,47,25,25,0.3,2,16,0.18,PASS,All clients participated every round; sequential single-host simulation.

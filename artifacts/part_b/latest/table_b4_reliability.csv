@@ -1,0 +1,5 @@
+clients,failed_rounds_total,timeout_count_total,client_dropouts_total,recovery_success_mean,data_corruption_total,notes
+2,0,0,0,100.0,0,No injected faults.
+5,0,0,0,100.0,0,No injected faults.
+10,0,0,0,100.0,0,No injected faults.
+20,0,0,0,100.0,0,No injected faults.
