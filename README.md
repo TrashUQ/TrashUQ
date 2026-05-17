@@ -1,39 +1,76 @@
 <p align="center">
-  <img src="https://github.com/TrashUQ.png" alt="TrashUQ organization logo" width="120" />
+  <img src="https://github.com/TrashUQ.png" alt="TrashUQ organization logo" width="104" />
 </p>
 
-# TrashUQ
+<h1 align="center">TrashUQ</h1>
 
-**Edge AI + Federated Learning platform for real-time trash classification monitoring**
+<p align="center">
+  <strong>Edge AI + Federated Learning platform for real-time trash classification monitoring</strong>
+</p>
 
-![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688)
-![Next.js](https://img.shields.io/badge/Next.js-dashboard-000000)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-persistence-336791)
-![MQTT](https://img.shields.io/badge/MQTT-live%20telemetry-660066)
-![gRPC](https://img.shields.io/badge/gRPC-federated%20learning-244c5a)
-![Docker](https://img.shields.io/badge/Docker-compose-2496ed)
-![Python](https://img.shields.io/badge/Python-edge%20runtime-3776ab)
-![TypeScript](https://img.shields.io/badge/TypeScript-frontend-3178c6)
+<p align="center">
+  <em>Arduino-class edge nodes, MQTT telemetry, PostgreSQL persistence, FastAPI, Next.js and gRPC FL coordination in one deployable research prototype.</em>
+</p>
 
-![TrashUQ dashboard overview](docs/assets/readme/screenshots/dashboard_overview.png)
+<p align="center">
+  <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-backend-009688">
+  <img alt="Next.js" src="https://img.shields.io/badge/Next.js-dashboard-000000">
+  <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-persistence-336791">
+  <img alt="MQTT" src="https://img.shields.io/badge/MQTT-live%20telemetry-660066">
+  <img alt="gRPC" src="https://img.shields.io/badge/gRPC-federated%20learning-244c5a">
+  <img alt="Docker" src="https://img.shields.io/badge/Docker-compose-2496ed">
+  <img alt="Python" src="https://img.shields.io/badge/Python-edge%20runtime-3776ab">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-frontend-3178c6">
+</p>
+
+<p align="center">
+  <a href="#quick-start"><strong>Quick Start</strong></a>
+  ·
+  <a href="#validation-highlights"><strong>Validation</strong></a>
+  ·
+  <a href="#system-architecture"><strong>Architecture</strong></a>
+  ·
+  <a href="#federated-learning"><strong>Federated Learning</strong></a>
+  ·
+  <a href="#evaluation-summary"><strong>Evaluation</strong></a>
+</p>
+
+<p align="center">
+  <img src="docs/assets/readme/screenshots/dashboard_overview.png" alt="TrashUQ live dashboard showing Arduino-class edge clients, FL metrics and MQTT event streams" />
+</p>
+
+<p align="center">
+  <strong>Deployed validation:</strong> 2 Arduino-class UNO Q MPUs · 282 MQTT messages persisted · 26 FL rounds · model_version 0 to 26 · dashboard updates under 1 second
+</p>
+
+## Executive Summary
 
 TrashUQ is an end-to-end Edge AI and Federated Learning platform for real-time trash classification monitoring. It connects Arduino-class edge nodes, MQTT telemetry, PostgreSQL persistence, a FastAPI backend, a live Next.js dashboard and a gRPC Federated Learning coordinator into a single deployable system.
 
-The platform has been validated with a two-node Arduino-class deployment, 282 persisted MQTT messages, 26 FL rounds, live dashboard synchronization and a controlled FL scalability study using FedAvg across 2, 5, 10 and 20 clients.
+The system has been validated as a multi-node edge-to-cloud prototype on `bepes-server` (`172.20.10.12`) with two UNO Q MPU clients. During the deployed run, TrashUQ persisted 282 MQTT messages with full JSON payload fidelity, displayed both edge clients live in the dashboard, executed 26 FL rounds, advanced the global model version monotonically from 0 to 26, and rejected stale concurrent updates correctly.
 
-This README describes the project as one unified platform. The code is temporarily split into `TrashUQ/` and `edge/`, but the system is presented here as the final merged architecture.
+Part B extends the deployed validation with a controlled FedAvg scalability study across 2, 5, 10 and 20 clients under non-IID partitions. Final accuracy remained in the 93-94% range while communication cost scaled predictably with the number of participating clients.
 
-## Why TrashUQ?
+This README presents TrashUQ as one unified platform. The code is currently organized across `TrashUQ/` and `edge/`, matching the final merged architecture used by the server, dashboard, MQTT, PostgreSQL, gRPC FL coordinator, simulator and edge runtime.
 
-Urban waste monitoring is a strong edge AI use case: inference should happen near the sensor, fleet telemetry must be visible in real time, and model coordination should work across distributed clients. TrashUQ demonstrates the full edge-to-cloud path:
+## Thesis-Grade Contributions
 
-- Arduino-class devices publishing operational telemetry and FL progress,
-- MQTT streams persisted with full topic and JSON payload fidelity,
-- a live dashboard for devices, classifications, events and FL charts,
-- a gRPC coordinator with monotonic round/model-version tracking,
-- TensorFlow Lite trash material classification at the edge,
-- reproducible no-hardware demo workflows,
-- paper-ready validation artifacts for deployed integration and FL scalability.
+| Contribution | What TrashUQ demonstrates |
+| --- | --- |
+| End-to-end edge-to-cloud integration | Arduino-class clients publish MQTT telemetry into a persisted backend and live dashboard |
+| Real-time observability | Device status, metrics, classifications, logs and FL charts update through REST bootstrap plus MQTT WebSocket streams |
+| Federated Learning coordination | gRPC `Join`, `GetGlobalModel` and `SubmitUpdate` workflows with monotonic round/model-version tracking |
+| Concurrency control | stale parallel updates are rejected correctly while the coordinator advances from `model_version` 0 to 26 |
+| Edge AI runtime | TFLite trash material classification path for cardboard, glass, paper and plastic |
+| Paper-ready evidence | deployed Arduino-class validation plus FedAvg scalability results with 2/5/10/20 clients |
+
+## What Makes It Stand Out
+
+- **A complete system, not a dashboard mockup:** edge clients, MQTT broker, backend subscriber, database schema, dashboard, gRPC coordinator and model runtime are wired together.
+- **Deployed multi-node validation:** two UNO Q MPU devices published telemetry and participated in FL coordination against the same server stack.
+- **Data integrity through the whole pipeline:** PostgreSQL persisted all MQTT messages with full topic and JSON payload fidelity.
+- **Research-ready FL behavior:** 26 rounds, 25 successful aggregations, monotonic model-versioning and concurrency-safe stale update rejection.
+- **Demo-ready reproducibility:** the no-hardware simulator publishes the same MQTT contract through the same backend, database and dashboard path.
 
 ## Current Capability Map
 
