@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://github.com/TrashUQ.png" alt="TrashUQ organization logo" width="120" />
+</p>
+
 # TrashUQ
 
 **Edge AI + Federated Learning platform for real-time trash classification monitoring**
