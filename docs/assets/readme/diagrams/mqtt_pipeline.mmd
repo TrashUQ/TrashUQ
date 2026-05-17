@@ -1,0 +1,20 @@
+sequenceDiagram
+  participant Edge as Arduino-class Edge Node
+  participant Broker as Mosquitto
+  participant Backend as Backend Subscriber
+  participant DB as PostgreSQL
+  participant API as Dashboard Bootstrap API
+  participant UI as Frontend Dashboard
+
+  Edge->>Broker: PUBLISH arduino/<device-id>/status
+  Edge->>Broker: PUBLISH arduino/<device-id>/metrics
+  Edge->>Broker: PUBLISH arduino/<device-id>/classification
+  Edge->>Broker: PUBLISH arduino/<device-id>/event
+  Edge->>Broker: PUBLISH arduino/<device-id>/logs/help
+  Broker-->>Backend: SUB arduino/+/#
+  Backend->>DB: INSERT mqtt_messages
+  Backend->>DB: UPSERT latest status / INSERT metric history
+  UI->>API: GET /api/dashboard/bootstrap
+  API->>DB: Read latest devices, metrics, events
+  API-->>UI: Bootstrap state
+  Broker-->>UI: MQTT WebSocket live updates

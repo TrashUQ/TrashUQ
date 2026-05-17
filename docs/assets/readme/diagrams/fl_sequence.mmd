@@ -1,0 +1,19 @@
+sequenceDiagram
+  participant Client as Edge FL Client
+  participant Coord as FL Coordinator<br/>gRPC :50051
+  participant Agg as FedAvg Aggregation
+
+  Client->>Coord: Join(client_id)
+  Coord-->>Client: round, model_version, global_weights
+  Client->>Coord: GetGlobalModel(client_id)
+  Coord-->>Client: current global weights
+  Client->>Coord: SubmitUpdate(client_id, round, num_samples, local_weights, local_loss, local_accuracy)
+  alt round ready for aggregation
+    Coord->>Agg: weighted average by num_samples
+    Agg-->>Coord: new global weights
+    Coord-->>Client: round_aggregated=true, new model_version
+  else concurrent or stale submission
+    Coord-->>Client: monotonic round/version response
+  end
+
+  Note over Client,Coord: Deployed validation advanced model_version 0 to 26 with concurrency-safe stale update rejection.

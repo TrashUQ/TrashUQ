@@ -1,0 +1,26 @@
+flowchart TB
+  Browser["Browser<br/>http://172.20.10.12:3000"]
+
+  subgraph Host["bepes-server / 172.20.10.12"]
+    subgraph Compose["Docker Compose"]
+      Frontend["frontend<br/>Next.js<br/>3000"]
+      Backend["backend<br/>FastAPI + gRPC<br/>4000 / 50051"]
+      DB["db<br/>PostgreSQL<br/>5433 -> 5432"]
+      MQTT["mqtt<br/>Mosquitto<br/>1883 / 9001"]
+    end
+  end
+
+  U1["unoq-01<br/>UNO Q MPU<br/>172.20.10.7"]
+  U2["unoq-02<br/>UNO Q MPU<br/>172.20.10.2"]
+  EdgeSim["controlled simulator<br/>reproducible demo"]
+
+  Browser --> Frontend
+  Browser -->|"WebSocket MQTT"| MQTT
+  Frontend -->|"BACKEND_API_URL=http://backend:4000"| Backend
+  Backend --> DB
+  Backend -->|"subscribe arduino/+/#"| MQTT
+  U1 -->|"MQTT telemetry"| MQTT
+  U2 -->|"MQTT telemetry"| MQTT
+  U1 -->|"gRPC FL"| Backend
+  U2 -->|"gRPC FL"| Backend
+  EdgeSim -->|"MQTT demo telemetry"| MQTT

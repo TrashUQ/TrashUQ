@@ -1,0 +1,32 @@
+{
+  "dataset": {
+    "source_name": "Synthetic TrashNet-style fallback",
+    "source_path": "generated://synthetic-trashnet-style",
+    "samples_per_class": {
+      "cardboard": 220,
+      "glass": 220,
+      "paper": 220,
+      "plastic": 220
+    }
+  },
+  "config": {
+    "client_counts": [
+      2,
+      5,
+      10,
+      20
+    ],
+    "seeds": [
+      11,
+      29,
+      47
+    ],
+    "rounds": 25,
+    "local_epochs": 2,
+    "batch_size": 16,
+    "learning_rate": 0.18,
+    "alpha": 0.3,
+    "optimizer": "SGD"
+  },
+  "generated_at": "2026-05-17T10:50:58.400102"
+}

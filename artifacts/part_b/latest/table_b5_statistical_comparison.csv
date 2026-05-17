@@ -1,0 +1,4 @@
+comparison,test,p_value,effect_size,significant,notes
+2 vs 5 clients,Exact permutation,1.0,0.2581988897471523,NO,n=3 per setting
+5 vs 10 clients,Exact permutation,1.0,0.18257418583506002,NO,n=3 per setting
+10 vs 20 clients,Exact permutation,0.9,-0.4082482904638608,NO,n=3 per setting

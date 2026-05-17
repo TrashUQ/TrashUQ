@@ -1,0 +1,26 @@
+flowchart LR
+  subgraph Edge["Arduino-class Edge Nodes"]
+    U1["unoq-01<br/>UNO Q MPU"]
+    U2["unoq-02<br/>UNO Q MPU"]
+    Simulator["Controlled simulator<br/>reproducible demo mode"]
+  end
+
+  subgraph Compose["TrashUQ Deployable Stack"]
+    MQTT["Mosquitto MQTT<br/>1883 / ws 9001"]
+    Backend["FastAPI Backend<br/>REST 4000 + gRPC 50051"]
+    DB["PostgreSQL<br/>5432"]
+    Frontend["Next.js Dashboard<br/>3000"]
+  end
+
+  Browser["Browser"]
+
+  U1 -->|"MQTT telemetry + FL progress"| MQTT
+  U2 -->|"MQTT telemetry + FL progress"| MQTT
+  Simulator -->|"MQTT demo traffic"| MQTT
+  MQTT -->|"backend subscribes arduino/+/#"| Backend
+  Backend -->|"persist messages + dashboard state"| DB
+  Frontend -->|"GET /api/dashboard/bootstrap"| Backend
+  Browser -->|"http://localhost:3000"| Frontend
+  Browser -->|"MQTT WebSocket ws://localhost:9001/mqtt"| MQTT
+  U1 -->|"gRPC Join / GetGlobalModel / SubmitUpdate"| Backend
+  U2 -->|"gRPC Join / GetGlobalModel / SubmitUpdate"| Backend
