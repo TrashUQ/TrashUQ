@@ -3,7 +3,7 @@
 The checked-in screenshot `dashboard_overview.png` was captured from the real local stack after running:
 
 ```sh
-cd TrashUQ
+cd .
 docker compose up --build
 ```
 

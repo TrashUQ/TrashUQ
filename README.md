@@ -51,7 +51,7 @@ The system has been validated as a multi-node edge-to-cloud prototype on `bepes-
 
 Part B extends the deployed validation with a controlled FedAvg scalability study across 2, 5, 10 and 20 clients under non-IID partitions. Final accuracy remained in the 93-94% range while communication cost scaled predictably with the number of participating clients.
 
-This README presents TrashUQ as one unified platform. The code is currently organized across `TrashUQ/` and `edge/`, matching the final merged architecture used by the server, dashboard, MQTT, PostgreSQL, gRPC FL coordinator, simulator and edge runtime.
+This README presents TrashUQ as one unified platform. The code is organized in a single repository with dedicated folders for runtime services, edge code, experiments, and generated artifacts.
 
 ## Thesis-Grade Contributions
 
@@ -156,31 +156,16 @@ Diagram sources live in `docs/assets/readme/diagrams/`.
 ## Repository Layout
 
 ```text
-TrashNet/
-  TrashUQ/                         # server, dashboard, backend, MQTT, DB, FL coordinator
-    compose.yaml                   # db, mqtt, backend, frontend
-    backend/app/main.py            # FastAPI routes and startup
-    backend/app/mqtt_runtime.py    # MQTT subscriber, arduino/+/# ingest
-    backend/app/service.py         # normalization, persistence reads, dashboard bootstrap
-    backend/app/db.py              # PostgreSQL schema
-    backend/app/fl.proto           # FL gRPC contract
-    backend/app/fl_coordinator.py  # in-memory weighted aggregation coordinator
-    frontend/app/page.tsx          # dashboard UI
-    frontend/lib/mqtt.ts           # browser MQTT WebSocket client
-    mqtt/mosquitto.conf            # MQTT + WebSocket listeners
-    experiments/part_b/            # FL scalability experiment runner
-    artifacts/part_b/latest/       # generated Part B metrics and figures
-    docs/assets/readme/            # README screenshots and diagrams
-  edge/                            # edge client, simulator, model runtime, MQTT/gRPC client
-    app/config.py                  # edge environment configuration
-    app/mqtt_client.py             # MQTT publisher contract
-    app/edge_simulator.py          # no-hardware live demo
-    app/fl_client.py               # gRPC validation client
-    app/model_runner.py            # TFLite classification wrapper
-    app/camera_runtime.py          # camera/image/video frame source
-    app/real_edge_runtime.py       # real runtime loop
-    scripts/                       # verification scripts
-    models/trash_classifier.tflite # TFLite classifier
+TrashUQ/
+  compose.yaml                     # Docker Compose stack
+  backend/                         # FastAPI API, MQTT ingest, FL coordinator, DB integration
+  frontend/                        # Next.js dashboard
+  mqtt/                            # Mosquitto broker config
+  edge/                            # edge runtime, FL client, model runtime, tests, benchmarks
+  experiments/part_b/              # FL scalability experiment runner
+  artifacts/part_b/latest/         # generated metrics, figures, and logs
+  docs/assets/readme/              # README diagrams and screenshots
+  docs/demos/mockups/              # internal/demo MQTT + gRPC simulation scripts
 ```
 
 ## Services and Ports
@@ -199,7 +184,7 @@ Deployed validation server: `bepes-server`, `172.20.10.12`.
 ## Quick Start
 
 ```sh
-cd TrashUQ
+cd .
 cp backend/.env.example backend/.env
 docker compose up --build
 ```
@@ -225,7 +210,7 @@ http://localhost:3000
 Terminal 1: server
 
 ```sh
-cd TrashUQ
+cd .
 docker compose up --build
 ```
 
@@ -239,7 +224,7 @@ uv run python -m app.edge_simulator
 Terminal 3: MQTT monitor
 
 ```sh
-cd TrashUQ
+cd .
 docker compose exec mqtt mosquitto_sub -h localhost -p 1883 -t 'arduino/+/+' -v
 ```
 
@@ -559,7 +544,7 @@ flowchart TB
 Server:
 
 ```sh
-cd TrashUQ
+cd .
 docker compose ps
 curl http://localhost:4000/health
 curl http://localhost:4000/api/dashboard/bootstrap
@@ -571,7 +556,7 @@ docker compose exec mqtt mosquitto_sub -h localhost -p 1883 -t 'arduino/+/+' -v
 Database persistence:
 
 ```sh
-cd TrashUQ
+cd .
 docker compose exec db psql -U trashuq -d dashboard -c "select topic, payload, created_at from mqtt_messages order by created_at desc limit 20;"
 ```
 
