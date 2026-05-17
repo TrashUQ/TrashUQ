@@ -5,9 +5,9 @@ Uses the same 5-frame majority-vote logic as the bin MPU pipeline.
 Runs on Mac with tensorflow (not tflite-runtime) — swap the import on the MPU.
 
 Usage:
-    uv run python test_webcam.py
-    uv run python test_webcam.py --model models/trash_classifier_quant.tflite
-    uv run python test_webcam.py --camera 1   # if built-in cam is index 0
+    uv run python scripts/manual/webcam_classifier_demo.py
+    uv run python scripts/manual/webcam_classifier_demo.py --model models/trash_classifier_quant.tflite
+    uv run python scripts/manual/webcam_classifier_demo.py --camera 1   # if built-in cam is index 0
 """
 import argparse
 import collections
