@@ -45,7 +45,7 @@
 % Slide 1: Title Slide
 \begin{frame}[plain]
     \begin{center}
-        \includegraphics[width=0.3\textwidth]{presentation_assets/logo.png} \\
+        \includegraphics[width=0.3\textwidth, height=0.2\textheight, keepaspectratio]{presentation_assets/logo.png} \\
         \vspace{0.5cm}
         \Huge \textbf{\textcolor{TrashDarkBlue}{TrashUQ}} \\
         \Large \textit{Edge AI + Federated Learning Platform} \\
@@ -53,7 +53,7 @@
         \large Aleix Bertran Andreu $\cdot$ Aleix Rosinach \\
         Bru $\cdot$ Pol Llinàs \\
         \vspace{0.5cm}
-        \small \textcolor{gray}{May 2026 $\cdot$ Real-Time Monitoring & Scaling Validation}
+        \small \textcolor{gray}{May 2026 $\cdot$ Real-Time Monitoring \& Scaling Validation}
     \end{center}
 \end{frame}
 
@@ -64,7 +64,7 @@
             \textbf{TrashUQ} is an end-to-end platform for intelligent waste monitoring.
             \begin{itemize}
                 \item \textbf{Decentralized Training}: Federated Learning at the Edge.
-                \item \textbf{Real-Time Pipeline}: MQTT telemetry & WebSocket dashboard.
+                \item \textbf{Real-Time Pipeline}: MQTT telemetry \& WebSocket dashboard.
                 \item \textbf{Robust Persistence}: PostgreSQL storage of every event.
                 \item \textbf{Validated Hardware}: Deployed on Arduino-class MPU nodes.
             \end{itemize}
@@ -73,8 +73,8 @@
             \begin{tcolorbox}[colback=TrashTeal!10,colframe=TrashTeal,title=Core Stack]
                 \small
                 \begin{itemize}
-                    \item \textbf{Backend}: FastAPI & gRPC
-                    \item \textbf{Edge}: TFLite & Python
+                    \item \textbf{Backend}: FastAPI \& gRPC
+                    \item \textbf{Edge}: TFLite \& Python
                     \item \textbf{Dashboard}: Next.js
                     \item \textbf{Broker}: Mosquitto
                 \end{itemize}
@@ -86,7 +86,7 @@
 % Slide 3: System Architecture (The "Real" Implementation)
 \begin{frame}{System Architecture}
     \begin{center}
-        \includegraphics[width=0.85\textwidth]{presentation_assets/architecture_perfect.png}
+        \includegraphics[width=0.9\textwidth, height=0.7\textheight, keepaspectratio]{presentation_assets/architecture_perfect.png}
     \end{center}
     \centering \small \textit{Three-Stage Pipeline: Edge Devices $\rightarrow$ Connectivity $\rightarrow$ Deployable Stack}
 \end{frame}
@@ -115,7 +115,7 @@
     \end{columns}
 \end{frame}
 
-% Slide 5: Connectivity: MQTT & gRPC
+% Slide 5: Connectivity: MQTT \& gRPC
 \begin{frame}{The Communication Backbone}
     \begin{columns}
         \begin{column}{0.6\textwidth}
@@ -143,7 +143,7 @@
 % Slide 6: Federated Learning (FL) scaling
 \begin{frame}{Federated Learning Scaling}
     \begin{center}
-        \includegraphics[width=0.85\textwidth]{presentation_assets/fl_scaling.png}
+        \includegraphics[width=0.9\textwidth, height=0.7\textheight, keepaspectratio]{presentation_assets/fl_scaling.png}
     \end{center}
     \centering \small \textit{FedAvg Validation: Scalability study across 2, 5, 10, and 20 clients.}
 \end{frame}
@@ -151,7 +151,7 @@
 % Slide 7: Live Dashboard Monitoring
 \begin{frame}{Next.js Live Dashboard}
     \begin{center}
-        \includegraphics[width=0.8\textwidth]{presentation_assets/dashboard.png}
+        \includegraphics[width=0.9\textwidth, height=0.7\textheight, keepaspectratio]{presentation_assets/dashboard.png}
     \end{center}
     \centering \small \textit{Bootstrap + MQTT WebSockets: Real-time charts and device summaries.}
 \end{frame}
@@ -193,7 +193,7 @@
 \end{frame}
 
 % Slide 10: Conclusion & Acknowledgments
-\begin{frame}{Summary & Team}
+\begin{frame}{Summary \& Team}
     \begin{columns}
         \begin{column}{0.5\textwidth}
             \textbf{TrashUQ Success}
