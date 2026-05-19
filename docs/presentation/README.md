@@ -1,57 +1,44 @@
-# TrashUQ Final Presentation
+# TrashUQ Presentation
 
-Interactive HTML presentation for the final TrashUQ project.
+This directory contains the formal academic presentation for the TrashUQ project.
 
-## Open
+## Files
 
-From the repository root:
+- `index.html`: The interactive HTML presentation (built with Reveal.js).
+- `TrashUQ_presentation.pdf`: The exported PDF version for offline viewing.
+- `assets/`: Contains screenshots and visual artifacts.
+- `export_pdf.sh`: A script to re-generate the PDF from the HTML.
 
-```bash
-cd TrashUQ/docs/presentation
-python3 -m http.server 8080
-```
+## How to View
 
-Then open:
+### Interactive HTML
+Simply open `index.html` in any modern web browser.
+- **Navigation:** Use arrow keys or click the controls in the bottom right.
+- **Overview:** Press 'O' to see a slide overview.
+- **Search:** Press 'Ctrl + F' to search within the slides.
 
-```text
-http://localhost:8080
-```
+### PDF Version
+Open `TrashUQ_presentation.pdf` with any PDF viewer.
 
-You can also open `index.html` directly in a browser.
+## How to Export PDF Manually
 
-## Controls
+If you need to update the presentation and re-export the PDF:
 
-- `Right Arrow`, `Space`, or `PageDown`: next slide
-- `Left Arrow`, `Backspace`, or `PageUp`: previous slide
-- `N`: toggle presenter notes
-- `F`: fullscreen
+1. Open `index.html` in Chrome or Edge.
+2. Append `?print-pdf` to the URL in the address bar (e.g., `file:///path/to/index.html?print-pdf`).
+3. Press `Ctrl + P` (Print).
+4. Select **Save as PDF** as the destination.
+5. Set **Layout** to **Landscape**.
+6. Under **More settings**, ensure **Background graphics** is checked.
+7. Click **Save**.
 
-## Export To PDF
+## Design Philosophy
 
-Run:
-
-```bash
-./export_pdf.sh
-```
-
-The script uses Chrome/Chromium headless if installed and writes `TrashUQ-final-presentation.pdf` in this directory. If Chrome/Chromium is not available, open the presentation in a browser and print to PDF.
-
-## Assets Included
-
-- `assets/dashboard_overview.png`: real TrashUQ dashboard screenshot
-- `assets/architecture.svg`: system architecture diagram copied from the paper assets
-- `assets/mqtt_flow.svg`: MQTT flow diagram copied from the paper assets
-- `assets/dashboard_data_flow.svg`: dashboard/backend data-flow diagram copied from the paper assets
-- `assets/grpc_fl_sequence.svg`: gRPC FL sequence diagram copied from the paper assets
-- `assets/deployment_topology.svg`: deployment topology diagram copied from the paper assets
-- `assets/part_b_accuracy_vs_rounds.png`: Part B accuracy figure copied from experiment artifacts
-- `assets/part_b_comm_cost_vs_clients.png`: Part B communication-cost figure copied from experiment artifacts
-
-Most presentation charts are inline SVG inside `index.html` so they remain crisp in browsers and PDF exports.
-
-## Speaker Split
-
-- Speaker 1: motivation, problem, architecture overview
-- Speaker 2: edge devices, MQTT pipeline, backend/database
-- Speaker 3: dashboard and Part A real deployment validation
-- Speaker 4: FL/gRPC, Part B scalability results, limitations and conclusion
+- **Style:** Clean, formal, academic engineering.
+- **Color Palette:**
+  - Navy (#0f172a): Headers and primary text.
+  - Teal (#0f766e): Accents, charts, and progress.
+  - Slate (#475569): Subheaders and secondary text.
+  - Light Gray (#f8fafc): Background containers.
+- **Visuals:** Uses Mermaid.js for architecture diagrams and Chart.js for result visualizations.
+- **Content:** Focuses on the edge-to-cloud pipeline, MQTT telemetry, and Federated Learning validation results.
