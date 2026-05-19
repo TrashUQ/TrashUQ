@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TrashUQ Final Project Presentation</title>
+  <meta name="description" content="TrashUQ final project presentation: Edge AI, MQTT dashboard, and Federated Learning." />
+  <style>
+    :root {
+      --bg: #03100f;
+      --bg-2: #071b1c;
+      --panel: rgba(8, 31, 31, 0.78);
+      --panel-2: rgba(13, 47, 45, 0.72);
+      --line: rgba(115, 255, 218, 0.22);
+      --line-strong: rgba(115, 255, 218, 0.52);
+      --text: #ecfffa;
+      --muted: #9bc8bf;
+      --soft: #d7fff6;
+      --teal: #32f5c8;
+      --green: #93ff7a;
+      --cyan: #6bdcff;
+      --amber: #ffe083;
+      --red: #ff6b8d;
+      --shadow: 0 30px 90px rgba(0, 0, 0, 0.44);
+      --radius: 26px;
+      --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+      --display: "Space Grotesk", "Sora", "Segoe UI", sans-serif;
+      --body: "Manrope", "Aptos", "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; overflow: hidden; }
+    body {
+      background:
+        radial-gradient(circle at 18% 18%, rgba(50, 245, 200, 0.20), transparent 30%),
+        radial-gradient(circle at 82% 18%, rgba(107, 220, 255, 0.18), transparent 28%),
+        radial-gradient(circle at 50% 110%, rgba(147, 255, 122, 0.16), transparent 30%),
+        linear-gradient(135deg, #020807 0%, #06191a 48%, #020b10 100%);
+      color: var(--text);
+      font-family: var(--body);
+      letter-spacing: -0.01em;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(115, 255, 218, 0.055) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(115, 255, 218, 0.055) 1px, transparent 1px);
+      background-size: 46px 46px;
+      mask-image: radial-gradient(circle at center, black 0%, transparent 76%);
+    }
+
+    .deck { height: 100vh; width: 100vw; position: relative; perspective: 1200px; }
+    .slide {
+      position: absolute;
+      inset: 34px 42px 70px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 22px;
+      padding: 42px 48px 34px;
+      border: 1px solid var(--line);
+      border-radius: 34px;
+      background:
+        linear-gradient(145deg, rgba(4, 21, 22, 0.90), rgba(4, 12, 14, 0.74)),
+        radial-gradient(circle at 100% 0%, rgba(50, 245, 200, 0.16), transparent 34%);
+      box-shadow: var(--shadow);
+      opacity: 0;
+      transform: translate3d(3vw, 0, -80px) rotateY(-4deg) scale(0.985);
+      pointer-events: none;
+      transition: opacity 360ms ease, transform 500ms cubic-bezier(.2,.8,.2,1);
+      overflow: hidden;
+    }
+
+    .slide::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      border-radius: inherit;
+      background: linear-gradient(90deg, transparent, rgba(115, 255, 218, 0.08), transparent);
+      transform: translateX(-100%);
+      animation: scan 7s ease-in-out infinite;
+    }
+
+    .slide.active { opacity: 1; transform: translate3d(0, 0, 0) rotateY(0) scale(1); pointer-events: auto; }
+    .slide.past { opacity: 0; transform: translate3d(-3vw, 0, -80px) rotateY(4deg) scale(0.985); }
+
+    @keyframes scan { 0%, 64% { transform: translateX(-105%); } 82%, 100% { transform: translateX(105%); } }
+
+    header { display: flex; align-items: flex-start; justify-content: space-between; gap: 28px; z-index: 2; }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--teal);
+      font-family: var(--mono);
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: .14em;
+    }
+    .eyebrow::before { content: ""; width: 10px; height: 10px; border-radius: 999px; background: var(--green); box-shadow: 0 0 22px var(--green); }
+    h1, h2, h3 { font-family: var(--display); margin: 0; letter-spacing: -0.055em; line-height: .92; }
+    h1 { font-size: clamp(72px, 9.4vw, 138px); max-width: 980px; }
+    h2 { font-size: clamp(48px, 6.4vw, 86px); max-width: 980px; }
+    h3 { font-size: 26px; line-height: 1.05; letter-spacing: -0.035em; }
+    p { margin: 0; color: var(--muted); font-size: 24px; line-height: 1.28; }
+    strong { color: var(--soft); }
+    code, .code { font-family: var(--mono); color: var(--teal); }
+
+    .speaker {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      padding: 10px 14px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(11, 41, 42, .72);
+      color: var(--soft);
+      font-family: var(--mono);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .content { position: relative; z-index: 2; min-height: 0; }
+    .two-col { display: grid; grid-template-columns: 1.05fr .95fr; gap: 28px; height: 100%; align-items: center; }
+    .three-col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+    .stack { display: grid; gap: 18px; align-content: center; }
+    .center { display: grid; place-items: center; text-align: center; }
+    .bottom { align-content: end; }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 24px;
+      background: linear-gradient(160deg, var(--panel), rgba(5, 18, 20, 0.54));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+    }
+    .card.hot { border-color: rgba(147, 255, 122, .38); background: linear-gradient(160deg, rgba(33, 79, 58, .72), rgba(5, 18, 20, .56)); }
+    .card.cyan { border-color: rgba(107, 220, 255, .36); }
+    .metric { display: grid; gap: 4px; align-content: start; min-height: 138px; }
+    .metric .num { font-family: var(--display); font-size: clamp(52px, 6vw, 84px); line-height: .85; letter-spacing: -0.07em; color: var(--soft); text-shadow: 0 0 30px rgba(50,245,200,.22); }
+    .metric .label { color: var(--muted); font-size: 18px; line-height: 1.22; }
+    .metric .tag { color: var(--teal); font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+
+    .chips { display: flex; flex-wrap: wrap; gap: 12px; }
+    .chip { padding: 11px 14px; border: 1px solid var(--line); border-radius: 999px; background: rgba(12, 45, 44, .66); color: var(--soft); font-family: var(--mono); font-size: 14px; }
+    .bullets { display: grid; gap: 14px; padding: 0; margin: 0; list-style: none; }
+    .bullets li { position: relative; padding-left: 28px; color: var(--soft); font-size: 25px; line-height: 1.2; }
+    .bullets li::before { content: ""; position: absolute; left: 0; top: .45em; width: 10px; height: 10px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 18px var(--teal); }
+
+    .hero-panel {
+      position: relative;
+      min-height: 500px;
+      border-radius: 36px;
+      overflow: hidden;
+      border: 1px solid var(--line-strong);
+      background: rgba(3, 18, 19, .88);
+      box-shadow: 0 24px 80px rgba(0,0,0,.46), 0 0 70px rgba(50,245,200,.10);
+    }
+    .hero-panel img, .asset-img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    .dashboard-shot { background: #051111; padding: 12px; height: 520px; }
+    .dashboard-shot img { border-radius: 22px; object-fit: cover; object-position: top left; }
+    .caption { color: var(--muted); font-family: var(--mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+
+    .diagram { padding: 20px; min-height: 460px; display: grid; place-items: center; }
+    .diagram img { max-width: 100%; max-height: 430px; filter: invert(1) hue-rotate(120deg) saturate(.75) brightness(1.35); mix-blend-mode: screen; }
+
+    .flow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; align-items: center; }
+    .node { min-height: 152px; padding: 18px; border: 1px solid var(--line); border-radius: 24px; background: rgba(8, 32, 33, .74); display: grid; gap: 12px; align-content: center; text-align: center; }
+    .node .icon { font-size: 38px; filter: drop-shadow(0 0 12px rgba(50,245,200,.28)); }
+    .node .name { font-family: var(--display); font-size: 23px; letter-spacing: -.04em; color: var(--soft); }
+    .node .desc { color: var(--muted); font-family: var(--mono); font-size: 12px; line-height: 1.3; }
+    .arrow { height: 2px; background: linear-gradient(90deg, transparent, var(--teal), transparent); position: relative; }
+    .arrow::after { content: ""; position: absolute; right: 0; top: -5px; width: 10px; height: 10px; border-top: 2px solid var(--teal); border-right: 2px solid var(--teal); transform: rotate(45deg); }
+
+    .chart-card { padding: 18px 20px; }
+    svg.chart { width: 100%; height: 260px; overflow: visible; }
+    .axis { stroke: rgba(215,255,246,.28); stroke-width: 1; }
+    .bar { fill: url(#barGradient); rx: 9; }
+    .bar2 { fill: url(#barGradient2); rx: 9; }
+    .chart text { font-family: var(--mono); fill: var(--muted); font-size: 12px; }
+    .chart .value { fill: var(--soft); font-weight: 700; font-size: 15px; }
+    .chart-title { display: flex; justify-content: space-between; gap: 18px; align-items: baseline; margin-bottom: 10px; }
+    .chart-title span:first-child { font-family: var(--display); color: var(--soft); font-size: 22px; letter-spacing: -.03em; }
+    .chart-title span:last-child { font-family: var(--mono); color: var(--teal); font-size: 12px; }
+
+    .timeline { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    .step { position: relative; padding: 22px; min-height: 240px; }
+    .step .k { color: var(--green); font-family: var(--display); font-size: 52px; line-height: .9; letter-spacing: -.06em; }
+    .step p { font-size: 18px; }
+
+    .terminal { background: #020706; border: 1px solid rgba(50,245,200,.34); border-radius: 22px; padding: 20px; font-family: var(--mono); font-size: 19px; line-height: 1.55; color: #c8fff1; box-shadow: inset 0 0 28px rgba(50,245,200,.08); }
+    .terminal .prompt { color: var(--green); }
+    .terminal .dim { color: #79a89f; }
+
+    .footer { display: flex; align-items: center; justify-content: space-between; z-index: 2; color: var(--muted); font-family: var(--mono); font-size: 12px; text-transform: uppercase; letter-spacing: .1em; }
+    .progress-shell { position: fixed; left: 42px; right: 42px; bottom: 30px; height: 8px; border-radius: 99px; background: rgba(115,255,218,.10); overflow: hidden; z-index: 20; }
+    .progress { width: 0%; height: 100%; background: linear-gradient(90deg, var(--teal), var(--green)); box-shadow: 0 0 22px rgba(50,245,200,.55); transition: width 220ms ease; }
+    .hud { position: fixed; right: 42px; bottom: 45px; z-index: 22; display: flex; gap: 10px; align-items: center; }
+    button.hud-btn { cursor: pointer; border: 1px solid var(--line); color: var(--soft); background: rgba(8,32,33,.82); border-radius: 999px; padding: 10px 14px; font-family: var(--mono); }
+
+    .notes-panel {
+      position: fixed;
+      top: 34px;
+      right: 42px;
+      width: min(460px, calc(100vw - 84px));
+      max-height: calc(100vh - 116px);
+      overflow: auto;
+      z-index: 30;
+      padding: 22px;
+      border: 1px solid var(--line-strong);
+      border-radius: 24px;
+      background: rgba(2, 10, 12, .94);
+      box-shadow: var(--shadow);
+      display: none;
+    }
+    .notes-panel.open { display: block; }
+    .notes-panel h4 { margin: 0 0 12px; font-family: var(--display); font-size: 24px; }
+    .notes-panel p { font-size: 16px; color: var(--soft); margin-bottom: 10px; }
+    aside.notes { display: none; }
+
+    .speaker-map { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+    .speaker-map .card { min-height: 188px; }
+    .speaker-map .who { font-family: var(--mono); color: var(--teal); font-size: 13px; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 10px; }
+    .speaker-map h3 { margin-bottom: 10px; }
+    .speaker-map p { font-size: 17px; }
+
+    .mini { font-size: 16px; color: var(--muted); }
+    .big-quote { font-family: var(--display); font-size: clamp(42px, 5.4vw, 74px); line-height: .98; letter-spacing: -.055em; color: var(--soft); }
+    .glow { color: var(--teal); text-shadow: 0 0 28px rgba(50,245,200,.35); }
+    .green { color: var(--green); }
+    .cyan { color: var(--cyan); }
+    .amber { color: var(--amber); }
+
+    @media (max-width: 900px) {
+      html, body { overflow: auto; }
+      .deck { height: auto; }
+      .slide { position: relative; inset: auto; min-height: 100vh; margin: 0; border-radius: 0; padding: 30px 22px 90px; opacity: 1; transform: none; pointer-events: auto; display: none; }
+      .slide.active { display: grid; }
+      .two-col, .grid-2, .three-col, .speaker-map, .timeline { grid-template-columns: 1fr; }
+      .flow { grid-template-columns: 1fr; }
+      .arrow { height: 32px; width: 2px; margin: auto; background: linear-gradient(180deg, transparent, var(--teal), transparent); }
+      .arrow::after { right: -4px; top: auto; bottom: 0; transform: rotate(135deg); }
+      .hud { right: 20px; }
+      .progress-shell { left: 20px; right: 20px; }
+      h1 { font-size: 68px; }
+      h2 { font-size: 48px; }
+      p, .bullets li { font-size: 21px; }
+    }
+
+    @media print {
+      html, body { overflow: visible; background: #03100f; }
+      .slide { position: relative; inset: auto; opacity: 1 !important; transform: none !important; pointer-events: auto; page-break-after: always; width: 100vw; height: 56.25vw; min-height: 720px; border-radius: 0; margin: 0; }
+      .progress-shell, .hud, .notes-panel { display: none !important; }
+      .slide::after { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="deck" id="deck">
+    <section class="slide active" data-speaker="Speaker 1" data-title="Title">
+      <header>
+        <div><div class="eyebrow">Final Project Presentation</div><h1>Trash<span class="glow">UQ</span></h1></div>
+        <div class="speaker">Speaker 1 - Opening</div>
+      </header>
+      <div class="content two-col">
+        <div class="stack bottom">
+          <p class="big-quote">Edge AI + Federated Learning for <span class="green">real-time trash classification</span>.</p>
+          <div class="chips"><span class="chip">Arduino-class edge</span><span class="chip">MQTT telemetry</span><span class="chip">FastAPI + PostgreSQL</span><span class="chip">gRPC FedAvg</span></div>
+        </div>
+        <div class="hero-panel dashboard-shot"><img src="assets/dashboard_overview.png" alt="TrashUQ dashboard overview screenshot" /></div>
+      </div>
+      <div class="footer"><span>Technical university class</span><span>01 / 15</span></div>
+      <aside class="notes"><p>Open by framing TrashUQ as a complete system, not just a model: edge classification, real-time telemetry, backend persistence, live dashboard, and federated learning validation.</p><p>Mention that the deck is split across four presenters and uses the real Part A and Part B numbers.</p></aside>
+    </section>
+
+    <section class="slide" data-speaker="Speaker 1" data-title="Problem & Motivation">
+      <header><div><div class="eyebrow">Problem & Motivation</div><h2>Waste systems need <span class="glow">live intelligence</span>.</h2></div><div class="speaker">Speaker 1</div></header>
+      <div class="content two-col">
+        <div class="stack">
+          <ul class="bullets"><li>Urban bins are usually monitored late, manually, or centrally.</li><li>Sending raw images to cloud increases latency, bandwidth and privacy risk.</li><li>Operational value comes from telemetry: status, events, metrics and model health.</li><li>Federated learning lets devices improve without centralizing local samples.</li></ul>
+        </div>
+        <div class="grid-2">
+          <div class="card metric"><span class="tag">Edge AI</span><span class="num">low</span><span class="label">latency inference near the bin</span></div>
+          <div class="card metric"><span class="tag">MQTT</span><span class="num">live</span><span class="label">device telemetry and observability</span></div>
+          <div class="card metric"><span class="tag">FL</span><span class="num">local</span><span class="label">data remains on clients</span></div>
+          <div class="card metric hot"><span class="tag">Goal</span><span class="num">E2E</span><span class="label">validated monitoring platform</span></div>
+        </div>
+      </div>
+      <div class="footer"><span>Why edge + telemetry + FL</span><span>02 / 15</span></div>
+      <aside class="notes"><p>Keep this slide conceptual. The problem is not only classification accuracy; it is making a deployed trash monitoring system observable and updatable.</p><p>Transition to the architecture by saying each technology has a specific role: edge for inference, MQTT for telemetry, backend/database for persistence, dashboard for operations, gRPC for FL coordination.</p></aside>
+    </section>
+
+    <section class="slide" data-speaker="Speaker 1" data-title="System Overview">
+      <header><div><div class="eyebrow">System Overview</div><h2>Two connected planes: <span class="green">telemetry</span> and <span class="cyan">learning</span>.</h2></div><div class="speaker">Speaker 1</div></header>
+      <div class="content stack">
+        <div class="flow">
+          <div class="node"><div class="icon">EDGE</div><div class="name">Edge nodes</div><div class="desc">unoq-01 / unoq-02<br/>TFLite + telemetry</div></div>
+          <div class="arrow"></div>
+          <div class="node"><div class="icon">MQTT</div><div class="name">MQTT</div><div class="desc">arduino/&lt;device-id&gt;/#<br/>broker + WebSocket</div></div>
+          <div class="arrow"></div>
+          <div class="node"><div class="icon">API</div><div class="name">Backend</div><div class="desc">FastAPI<br/>subscriber + API</div></div>
+        </div>
+        <div class="flow">
+          <div class="node"><div class="icon">DB</div><div class="name">PostgreSQL</div><div class="desc">mqtt_messages<br/>persistent evidence</div></div>
+          <div class="arrow"></div>
+          <div class="node"><div class="icon">UI</div><div class="name">Dashboard</div><div class="desc">bootstrap API<br/>live WebSocket updates</div></div>
+          <div class="arrow"></div>
+          <div class="node"><div class="icon">FL</div><div class="name">FL Coordinator</div><div class="desc">gRPC<br/>Join / Get / Submit</div></div>
+        </div>
+      </div>
+      <div class="footer"><span>Edge - MQTT - Backend - DB - Dashboard | Edge - gRPC FL</span><span>03 / 15</span></div>
+      <aside class="notes"><p>Explain the split: the MQTT path gives observability and persistence; the gRPC path coordinates model updates. Both paths meet in the dashboard through metrics and events.</p><p>Emphasize that this was validated with two Arduino-class nodes, not only mocked in code.</p></aside>
+    </section>
+
+    <section class="slide" data-speaker="Speaker 2" data-title="Hardware / Edge Layer">
+      <header><div><div class="eyebrow">Hardware / Edge Layer</div><h2>Arduino-class nodes run the <span class="glow">edge runtime</span>.</h2></div><div class="speaker">Speaker 2</div></header>
+      <div class="content two-col">
+        <div class="grid-2">
+          <div class="card metric hot"><span class="tag">Device</span><span class="num">unoq-01</span><span class="label">UNO Q MPU, aarch64, Debian 13</span></div>
+          <div class="card metric"><span class="tag">Device</span><span class="num">unoq-02</span><span class="label">same runtime, independent client</span></div>
+          <div class="card metric"><span class="tag">Input</span><span class="num">fake</span><span class="label">camera mode for reproducible validation</span></div>
+          <div class="card metric cyan"><span class="tag">Model</span><span class="num">TFLite</span><span class="label">trash classifier + calibration head</span></div>
+        </div>
+        <div class="stack">
+          <div class="terminal"><span class="prompt">$</span> python -m bin_mpu.main \<br/>  <span class="dim">--device-id unoq-01</span> \<br/>  <span class="dim">--fake-camera --fl</span> \<br/>  <span class="dim">--fl-trigger-samples 2</span></div>
+          <ul class="bullets"><li>Publishes status, metrics, events and logs.</li><li>Fetches global FL head before local training.</li><li>Submits updates through gRPC after labelled samples.</li></ul>
+        </div>
+      </div>
+      <div class="footer"><span>Edge runtime from edge/ repo</span><span>04 / 15</span></div>
+      <aside class="notes"><p>Be clear about scope: synthetic frames were used because physical USB cameras were not connected. This improves reproducibility but means the classification topic was not exercised in Part A.</p><p>The important point is that the same edge daemon validated MQTT, local metrics and FL update flow on Arduino-class hardware.</p></aside>
+    </section>
+
+    <section class="slide" data-speaker="Speaker 2" data-title="MQTT Pipeline">
+      <header><div><div class="eyebrow">MQTT Pipeline</div><h2>A small topic contract makes the fleet <span class="green">observable</span>.</h2></div><div class="speaker">Speaker 2</div></header>
+      <div class="content two-col">
+        <div class="stack">
+          <div class="card"><h3>Topic contract</h3><div class="chips" style="margin-top:18px"><span class="chip">arduino/&lt;device-id&gt;/status</span><span class="chip">arduino/&lt;device-id&gt;/metrics</span><span class="chip">arduino/&lt;device-id&gt;/classification</span><span class="chip">arduino/&lt;device-id&gt;/event</span><span class="chip">arduino/&lt;device-id&gt;/logs</span><span class="chip">arduino/&lt;device-id&gt;/help</span></div></div>
+          <div class="terminal"><span class="prompt">mosquitto_sub</span> -h localhost -p 1883 \<br/>  -t <span class="green">'arduino/+/+'</span> -v</div>
+        </div>
+        <div class="card diagram"><img src="assets/mqtt_flow.svg" alt="MQTT flow diagram" /></div>
+      </div>
+      <div class="footer"><span>MQTT broker + backend subscriber + browser WebSocket</span><span>05 / 15</span></div>
+      <aside class="notes"><p>Explain that MQTT is intentionally simple: each device owns a namespace and each data type has a predictable suffix.</p><p>Point out the backend subscribes to arduino/+/#, persists payloads, and the frontend also receives live MQTT WebSocket updates.</p></aside>
+    </section>
+
+    <section class="slide" data-speaker="Speaker 2" data-title="Backend & Persistence">
+      <header><div><div class="eyebrow">Backend & Persistence</div><h2>The backend turns live packets into <span class="cyan">evidence</span>.</h2></div><div class="speaker">Speaker 2</div></header>
+      <div class="content two-col">
+        <div class="card diagram"><img src="assets/dashboard_data_flow.svg" alt="Dashboard data flow diagram" /></div>
+        <div class="stack">
+          <div class="grid-2">
+            <div class="card metric"><span class="tag">API</span><span class="num">FastAPI</span><span class="label">health, bootstrap and integration endpoints</span></div>
+            <div class="card metric"><span class="tag">DB</span><span class="num">Postgres</span><span class="label">mqtt_messages persistence table</span></div>
+          </div>
+          <div class="terminal"><span class="prompt">GET</span> /api/dashboard/bootstrap<br/><span class="prompt">INSERT</span> mqtt_messages(topic, payload, created_at)<br/><span class="prompt">SUB</span> arduino/+/#</div>
+          <p>Cold-start state comes from PostgreSQL. Live state continues through MQTT WebSocket events.</p>
+        </div>
+      </div>
+      <div class="footer"><span>Persistence makes the validation auditable</span><span>06 / 15</span></div>
+      <aside class="notes"><p>Stress that the dashboard is not just a front-end animation. It bootstraps from real persisted messages and then follows the live stream.</p><p>Use the phrase "evidence trail": the Part A message counts came from the mqtt_messages table.</p></aside>
+    </section>
+
+    <section class="slide" data-speaker="Speaker 3" data-title="Frontend Dashboard">
+      <header><div><div class="eyebrow">Frontend Dashboard</div><h2>Live observability for devices, metrics and FL.</h2></div><div class="speaker">Speaker 3</div></header>
+      <div class="content two-col">
+        <div class="hero-panel dashboard-shot"><img src="assets/dashboard_overview.png" alt="Dashboard screenshot with device and FL panels" /></div>
+        <div class="stack">
+          <div class="three-col">
+            <div class="card metric"><span class="tag">Fleet</span><span class="num">2</span><span class="label">active devices online</span></div>
+            <div class="card metric"><span class="tag">Health</span><span class="num">CPU</span><span class="label">RAM and heartbeat telemetry</span></div>
+            <div class="card metric hot"><span class="tag">FL</span><span class="num">charts</span><span class="label">rounds, accuracy, loss, drift</span></div>
+          </div>
+          <ul class="bullets"><li>Device table: status, latest heartbeat and telemetry.</li><li>Metric cards: active devices, CPU/RAM, last MQTT event.</li><li>Event stream: logs, FL events and operational signals.</li></ul>
+          <p class="caption">Real screenshot copied from docs/assets/readme/screenshots/dashboard_overview.png</p>
+        </div>
+      </div>
+      <div class="footer"><span>Frontend from TrashUQ/frontend</span><span>07 / 15</span></div>
+      <aside class="notes"><p>Walk the audience through the dashboard visually: top metrics, device summary, charts, and event stream.</p><p>Connect dashboard value to debugging: during validation we could see both devices online and metrics update within under one second.</p></aside>
+    </section>
+
+    <section class="slide" data-speaker="Speaker 4" data-title="Federated Learning">
+      <header><div><div class="eyebrow">Federated Learning</div><h2>gRPC coordinates local updates with <span class="green">FedAvg</span>.</h2></div><div class="speaker">Speaker 4</div></header>
+      <div class="content two-col">
+        <div class="stack">
+          <div class="timeline">
+            <div class="card step"><div class="k">01</div><h3>Join</h3><p>Client registers and receives current round/version.</p></div>
+            <div class="card step"><div class="k">02</div><h3>GetGlobalModel</h3><p>Device fetches latest calibration head.</p></div>
+            <div class="card step"><div class="k">03</div><h3>SubmitUpdate</h3><p>Local update and metrics sent to coordinator.</p></div>
+            <div class="card step hot"><div class="k">04</div><h3>FedAvg</h3><p>Coordinator aggregates and advances model_version.</p></div>
+          </div>
+          <div class="terminal">model_version: <span class="amber">0</span> -&gt; <span class="green">26</span><br/>stale updates rejected to preserve monotonic rounds</div>
+        </div>
+        <div class="card diagram"><img src="assets/grpc_fl_sequence.svg" alt="gRPC federated learning sequence diagram" /></div>
+      </div>
+      <div class="footer"><span>gRPC methods: Join - GetGlobalModel - SubmitUpdate</span><span>08 / 15</span></div>
+      <aside class="notes"><p>Explain why gRPC is separate from MQTT: FL needs request/response semantics, binary-friendly model payloads, and explicit coordinator responses.</p><p>Define FedAvg briefly: clients train locally, send updates, and the coordinator averages parameters into a new global version.</p></aside>
+    </section>
+
+    <section class="slide" data-speaker="Speaker 3" data-title="Part A Validation">
+      <header><div><div class="eyebrow">Part A - Real Deployment</div><h2>Two Arduino-class nodes validated end-to-end.</h2></div><div class="speaker">Speaker 3</div></header>
+      <div class="content grid-2">
+        <div class="card chart-card"><div class="chart-title"><span>MQTT messages per node</span><span>282 total</span></div><svg class="chart" viewBox="0 0 520 260" role="img" aria-label="MQTT messages per node"><defs><linearGradient id="barGradient" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#32f5c8"/><stop offset="1" stop-color="#93ff7a"/></linearGradient></defs><line class="axis" x1="60" y1="220" x2="480" y2="220"/><rect class="bar" x="110" y="52" width="110" height="168"/><rect class="bar" x="300" y="66" width="110" height="154"/><text x="165" y="245" text-anchor="middle">unoq-01</text><text x="355" y="245" text-anchor="middle">unoq-02</text><text class="value" x="165" y="38" text-anchor="middle">147</text><text class="value" x="355" y="52" text-anchor="middle">135</text></svg></div>
+        <div class="card chart-card"><div class="chart-title"><span>FL rounds / aggregations</span><span>83.3% success</span></div><svg class="chart" viewBox="0 0 520 260" role="img" aria-label="FL rounds and aggregations"><defs><linearGradient id="barGradient2" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#6bdcff"/><stop offset="1" stop-color="#32f5c8"/></linearGradient></defs><line class="axis" x1="60" y1="220" x2="480" y2="220"/><rect class="bar2" x="105" y="42" width="115" height="178"/><rect class="bar2" x="300" y="49" width="115" height="171"/><text x="162" y="245" text-anchor="middle">Rounds</text><text x="357" y="245" text-anchor="middle">Aggregations</text><text class="value" x="162" y="28" text-anchor="middle">26</text><text class="value" x="357" y="35" text-anchor="middle">25</text></svg></div>
+        <div class="card metric hot"><span class="tag">Reliability</span><span class="num">0%</span><span class="label">invalid payload rate and dropped message rate</span></div>
+        <div class="card metric"><span class="tag">Experience</span><span class="num">&lt;1s</span><span class="label">dashboard update lag with both devices visible online</span></div>
+      </div>
+      <div class="footer"><span>Part A evidence from PART_A_Arduino_Mixed_Test_Report_FILLED.md</span><span>09 / 15</span></div>
+      <aside class="notes"><p>This is the main real deployment proof. Say the two nodes persisted 282 MQTT messages: 147 from unoq-01 and 135 from unoq-02.</p><p>Then cover FL: 26 rounds, 25 successful aggregations, model_version 0 to 26, median submit latency around 25 ms. The stale rejections were expected race protection, not message loss.</p></aside>
+    </section>
+
+    <section class="slide" data-speaker="Speaker 4" data-title="Part B Scalability">
+      <header><div><div class="eyebrow">Part B - FL At Scale</div><h2>FedAvg stayed stable as client count increased.</h2></div><div class="speaker">Speaker 4</div></header>
+      <div class="content two-col">
+        <div class="stack">
+          <div class="chips"><span class="chip">2, 5, 10, 20 clients</span><span class="chip">25 rounds</span><span class="chip">3 seeds</span><span class="chip">Dirichlet alpha=0.3</span><span class="chip">FedAvg</span></div>
+          <div class="card chart-card"><div class="chart-title"><span>Final accuracy by clients</span><span>mean of 3 seeds</span></div><svg class="chart" viewBox="0 0 560 260"><defs><linearGradient id="barGradient3" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#93ff7a"/><stop offset="1" stop-color="#32f5c8"/></linearGradient></defs><line class="axis" x1="55" y1="220" x2="520" y2="220"/><rect fill="url(#barGradient3)" x="85" y="40" width="76" height="180" rx="9"/><rect fill="url(#barGradient3)" x="195" y="43" width="76" height="177" rx="9"/><rect fill="url(#barGradient3)" x="305" y="47" width="76" height="173" rx="9"/><rect fill="url(#barGradient3)" x="415" y="40" width="76" height="180" rx="9"/><text x="123" y="245" text-anchor="middle">2</text><text x="233" y="245" text-anchor="middle">5</text><text x="343" y="245" text-anchor="middle">10</text><text x="453" y="245" text-anchor="middle">20</text><text class="value" x="123" y="27" text-anchor="middle">93.75%</text><text class="value" x="233" y="30" text-anchor="middle">93.56%</text><text class="value" x="343" y="34" text-anchor="middle">93.37%</text><text class="value" x="453" y="27" text-anchor="middle">93.75%</text></svg></div>
+        </div>
+        <div class="stack">
+          <div class="card chart-card"><div class="chart-title"><span>Communication cost grows linearly</span><span>sent + received MB</span></div><svg class="chart" viewBox="0 0 560 260"><line class="axis" x1="55" y1="220" x2="520" y2="220"/><polyline points="105,198 220,170 335,119 470,38" fill="none" stroke="#6bdcff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="105" cy="198" r="8" fill="#32f5c8"/><circle cx="220" cy="170" r="8" fill="#32f5c8"/><circle cx="335" cy="119" r="8" fill="#32f5c8"/><circle cx="470" cy="38" r="8" fill="#32f5c8"/><text x="105" y="240" text-anchor="middle">2</text><text x="220" y="240" text-anchor="middle">5</text><text x="335" y="240" text-anchor="middle">10</text><text x="470" y="240" text-anchor="middle">20</text><text class="value" x="105" y="184" text-anchor="middle">0.39</text><text class="value" x="220" y="156" text-anchor="middle">0.99</text><text class="value" x="335" y="105" text-anchor="middle">1.97</text><text class="value" x="470" y="24" text-anchor="middle">3.94</text></svg></div>
+          <p>Accuracy remains around <strong>93-94%</strong>; the main cost is communication, which scales with participating clients.</p>
+        </div>
+      </div>
+      <div class="footer"><span>Part B artifacts: table_b2_convergence_summary.csv + table_b3_efficiency_cost.csv</span><span>10 / 15</span></div>
+      <aside class="notes"><p>State the experimental setup first: 2, 5, 10 and 20 clients, 25 rounds, 3 seeds, non-IID Dirichlet alpha 0.3.</p><p>The result is stable accuracy around 93 to 94 percent. The tradeoff is communication cost, which increases from about 0.39 MB at 2 clients to about 3.94 MB at 20 clients.</p></aside>
+    </section>
+
+    <section class="slide" data-speaker="Speaker 3 + 4" data-title="Results">
+      <header><div><div class="eyebrow">Results Snapshot</div><h2>Validation in six numbers.</h2></div><div class="speaker">Speaker 3 - Speaker 4 handoff</div></header>
+      <div class="content three-col">
+        <div class="card metric hot"><span class="tag">Real nodes</span><span class="num">2</span><span class="label">Arduino-class clients online in dashboard</span></div>
+        <div class="card metric"><span class="tag">Telemetry</span><span class="num">282</span><span class="label">MQTT messages persisted in PostgreSQL</span></div>
+        <div class="card metric"><span class="tag">FL rounds</span><span class="num">26</span><span class="label">model_version progressed 0 -&gt; 26</span></div>
+        <div class="card metric"><span class="tag">Aggregations</span><span class="num">25</span><span class="label">successful coordinator updates</span></div>
+        <div class="card metric cyan"><span class="tag">Simulation accuracy</span><span class="num">93-94%</span><span class="label">final accuracy at 2-20 clients</span></div>
+        <div class="card metric"><span class="tag">Dashboard lag</span><span class="num">&lt;1s</span><span class="label">live UI reactivity observed</span></div>
+      </div>
+      <div class="footer"><span>Part A + Part B combined evidence</span><span>11 / 15</span></div>
+      <aside class="notes"><p>This slide is a recap and handoff. Speaker 3 can summarize real deployment numbers; Speaker 4 can connect them to scalable FL evidence.</p><p>Keep it short: the system worked end-to-end, the database captured evidence, and FL was validated both on real nodes and at simulated scale.</p></aside>
+    </section>
+
+    <section class="slide" data-speaker="Speaker 1 + 2" data-title="Demo Flow">
+      <header><div><div class="eyebrow">Demo Flow</div><h2>Exactly what we run.</h2></div><div class="speaker">Shared demo</div></header>
+      <div class="content two-col">
+        <div class="terminal"><span class="prompt"># 1. start full stack</span><br/>docker compose up --build<br/><br/><span class="prompt"># 2. run edge runtime / simulator</span><br/>python -m bin_mpu.main --device-id unoq-01 --fake-camera --fl<br/><br/><span class="prompt"># 3. monitor raw MQTT</span><br/>docker compose exec mqtt mosquitto_sub -h localhost -p 1883 -t 'arduino/+/+' -v<br/><br/><span class="prompt"># 4. open dashboard</span><br/>http://localhost:3000</div>
+        <div class="timeline">
+          <div class="card step"><div class="k">01</div><h3>Stack</h3><p>Backend, DB, broker, dashboard.</p></div>
+          <div class="card step"><div class="k">02</div><h3>Nodes</h3><p>Edge clients connect and publish status.</p></div>
+          <div class="card step"><div class="k">03</div><h3>Observe</h3><p>MQTT stream and dashboard update live.</p></div>
+          <div class="card step hot"><div class="k">04</div><h3>FL</h3><p>Submit updates and watch model_version advance.</p></div>
+        </div>
+      </div>
+      <div class="footer"><span>Local development command flow</span><span>12 / 15</span></div>
+      <aside class="notes"><p>Use this as the live demo script. First start Docker Compose in TrashUQ, then run the edge daemon from the edge repo or the configured simulator, then show MQTT and the dashboard.</p><p>If the demo is not live, describe the expected visible changes: device online, heartbeat, metrics, events, and FL chart movement.</p></aside>
+    </section>
+
+    <section class="slide" data-speaker="Speaker 1 + 2 + 3 + 4" data-title="What We Learned">
+      <header><div><div class="eyebrow">What We Learned</div><h2>System integration matters as much as model code.</h2></div><div class="speaker">All presenters</div></header>
+      <div class="content grid-2">
+        <div class="card"><h3>Edge-to-cloud pipeline works</h3><p>MQTT - backend subscriber - PostgreSQL - dashboard created a traceable operational loop.</p></div>
+        <div class="card"><h3>MQTT is simple and robust</h3><p>A compact topic contract made multi-device telemetry easy to inspect and persist.</p></div>
+        <div class="card"><h3>Dashboard gives live observability</h3><p>Device health, metrics, FL charts and event stream exposed what was happening in real time.</p></div>
+        <div class="card hot"><h3>FL needs version discipline</h3><p>The coordinator's stale-round rejections protected monotonic model_version progression.</p></div>
+      </div>
+      <div class="footer"><span>Engineering lessons from deployment</span><span>13 / 15</span></div>
+      <aside class="notes"><p>Each presenter can take one lesson, or Speaker 4 can summarize. The strongest lesson is that real systems need observability and versioning, not only an ML loop.</p><p>Mention that multi-client validation exposed race behavior, and the coordinator handled it explicitly.</p></aside>
+    </section>
+
+    <section class="slide" data-speaker="Speaker 4" data-title="Limitations / Scope">
+      <header><div><div class="eyebrow">Limitations / Scope</div><h2>Research prototype, clear production path.</h2></div><div class="speaker">Speaker 4</div></header>
+      <div class="content two-col">
+        <div class="stack">
+          <ul class="bullets"><li>Controlled synthetic frames were used for reproducible Arduino validation.</li><li>Part A did not exercise physical camera/PIR classification payloads.</li><li>FL exchanges a compact calibration head, not full MobileNetV2 weights.</li><li>Same-network deployment; production networks need stronger fault testing.</li></ul>
+        </div>
+        <div class="grid-2">
+          <div class="card metric"><span class="tag">Production</span><span class="num">auth</span><span class="label">broker/API identity and access control</span></div>
+          <div class="card metric"><span class="tag">Fleet</span><span class="num">ops</span><span class="label">device provisioning and remote management</span></div>
+          <div class="card metric"><span class="tag">Data</span><span class="num">more</span><span class="label">larger, real-world datasets and camera runs</span></div>
+          <div class="card metric hot"><span class="tag">FL</span><span class="num">quorum</span><span class="label">round policies, dropout handling and security</span></div>
+        </div>
+      </div>
+      <div class="footer"><span>Scope stated explicitly and professionally</span><span>14 / 15</span></div>
+      <aside class="notes"><p>Be transparent. The limitations do not weaken the project; they define what was validated and what remains for production.</p><p>End by saying the prototype demonstrates the full architecture and provides a credible base for adding authentication, fleet management, real camera validation and larger datasets.</p></aside>
+    </section>
+
+    <section class="slide" data-speaker="Speaker 4" data-title="Conclusion">
+      <header><div><div class="eyebrow">Conclusion</div><h2>TrashUQ demonstrates a complete platform.</h2></div><div class="speaker">Speaker 4 - Closing</div></header>
+      <div class="content center">
+        <div class="stack" style="max-width:1100px">
+          <p class="big-quote">A complete <span class="glow">Edge AI + Federated Learning</span> monitoring platform with real deployed integration and experimental validation.</p>
+          <div class="speaker-map">
+            <div class="card"><div class="who">Speaker 1</div><h3>Why</h3><p>Problem, motivation and architecture.</p></div>
+            <div class="card"><div class="who">Speaker 2</div><h3>How</h3><p>Edge, MQTT, backend and database.</p></div>
+            <div class="card"><div class="who">Speaker 3</div><h3>Proof A</h3><p>Dashboard and real deployment validation.</p></div>
+            <div class="card hot"><div class="who">Speaker 4</div><h3>Proof B</h3><p>FL scalability, limitations and final message.</p></div>
+          </div>
+        </div>
+      </div>
+      <div class="footer"><span>TrashUQ final project</span><span>15 / 15</span></div>
+      <aside class="notes"><p>Close with the single strongest message: TrashUQ is end-to-end. It combines deployed edge nodes, MQTT telemetry, persistent backend evidence, a live dashboard, and federated learning validation.</p><p>Invite questions around architecture, validation numbers, or future production extensions.</p></aside>
+    </section>
+  </main>
+
+  <div class="progress-shell"><div class="progress" id="progress"></div></div>
+  <div class="hud"><button class="hud-btn" id="prevBtn">&larr; Prev</button><button class="hud-btn" id="notesBtn">Notes</button><button class="hud-btn" id="nextBtn">Next &rarr;</button></div>
+  <div class="notes-panel" id="notesPanel"><h4 id="notesTitle">Speaker notes</h4><div id="notesBody"></div></div>
+
+  <script>
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    const progress = document.getElementById('progress');
+    const notesPanel = document.getElementById('notesPanel');
+    const notesTitle = document.getElementById('notesTitle');
+    const notesBody = document.getElementById('notesBody');
+    let index = Number(new URLSearchParams(location.search).get('slide') || location.hash.replace('#', '') || 1) - 1;
+    index = Math.min(Math.max(index, 0), slides.length - 1);
+
+    function render() {
+      slides.forEach((slide, i) => {
+        slide.classList.toggle('active', i === index);
+        slide.classList.toggle('past', i < index);
+      });
+      progress.style.width = `${((index + 1) / slides.length) * 100}%`;
+      const active = slides[index];
+      const title = active.dataset.title || `Slide ${index + 1}`;
+      const speaker = active.dataset.speaker || '';
+      notesTitle.textContent = `${speaker} - ${title}`;
+      notesBody.innerHTML = active.querySelector('.notes')?.innerHTML || '<p>No notes for this slide.</p>';
+      history.replaceState(null, '', `#${index + 1}`);
+    }
+
+    function go(delta) { index = Math.min(Math.max(index + delta, 0), slides.length - 1); render(); }
+    document.getElementById('prevBtn').addEventListener('click', () => go(-1));
+    document.getElementById('nextBtn').addEventListener('click', () => go(1));
+    document.getElementById('notesBtn').addEventListener('click', () => notesPanel.classList.toggle('open'));
+    window.addEventListener('keydown', (event) => {
+      if (['ArrowRight', 'PageDown', ' '].includes(event.key)) { event.preventDefault(); go(1); }
+      if (['ArrowLeft', 'PageUp', 'Backspace'].includes(event.key)) { event.preventDefault(); go(-1); }
+      if (event.key.toLowerCase() === 'n') notesPanel.classList.toggle('open');
+      if (event.key.toLowerCase() === 'f') document.documentElement.requestFullscreen?.();
+      if (event.key === 'Escape') notesPanel.classList.remove('open');
+    });
+    render();
+  </script>
+</body>
+</html>
