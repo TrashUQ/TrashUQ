@@ -14,223 +14,207 @@
 \usetheme{Madrid}
 \usecolortheme{whale}
 
-% Custom Colors (Matching the TrashUQ Brand)
-\definecolor{TrashBlue}{HTML}{009688}
-\definecolor{TrashDark}{HTML}{244c5a}
+% Custom Colors (Matching TrashUQ Brand)
+\definecolor{TrashTeal}{HTML}{009688}
+\definecolor{TrashDarkBlue}{HTML}{244c5a}
 \definecolor{TrashAccent}{HTML}{3178c6}
 
-\setbeamercolor{palette primary}{bg=TrashDark, fg=white}
-\setbeamercolor{palette secondary}{bg=TrashBlue, fg=white}
+\setbeamercolor{palette primary}{bg=TrashDarkBlue, fg=white}
+\setbeamercolor{palette secondary}{bg=TrashTeal, fg=white}
 \setbeamercolor{palette tertiary}{bg=TrashAccent, fg=white}
 \setbeamercolor{titlelike}{parent=palette primary}
-\setbeamercolor{structure}{fg=TrashBlue}
+\setbeamercolor{structure}{fg=TrashTeal}
 
 \setbeamertemplate{navigation symbols}{}
 \setbeamertemplate{footline}[frame number]
 
 % --- Title Information ---
-\title[TrashUQ Presentation]{TrashUQ: Edge AI + Federated Learning}
-\subtitle{Real-Time Intelligent Waste Management}
+\title[TrashUQ: Edge AI + FL]{TrashUQ: Edge AI + Federated Learning}
+\subtitle{Real-Time Decentralized Waste Classification}
 \author[Aleix, Bru, Pol]{
     Aleix Bertran Andreu \and Aleix Rosinach \\
     Bru \and Pol Llinàs
 }
+\institute{Advanced Agentic Coding Project}
 \date{May 2026}
-\logo{\includegraphics[height=0.8cm]{presentation_assets/cover.png}} % Placeholder for logo if needed
+\logo{\includegraphics[height=0.8cm]{presentation_assets/logo.png}}
 
 % --- Document ---
 \begin{document}
 
-% Slide 1: Title Slide with Background
-{
-\setbeamertemplate{background}{\includegraphics[width=\paperwidth,height=\paperheight,keepaspectratio]{presentation_assets/cover.png}}
+% Slide 1: Title Slide
 \begin{frame}[plain]
-    % Empty frame to show background cover
+    \begin{center}
+        \includegraphics[width=0.3\textwidth]{presentation_assets/logo.png} \\
+        \vspace{0.5cm}
+        \Huge \textbf{\textcolor{TrashDarkBlue}{TrashUQ}} \\
+        \Large \textit{Edge AI + Federated Learning Platform} \\
+        \vspace{1cm}
+        \large Aleix Bertran Andreu $\cdot$ Aleix Rosinach \\
+        Bru $\cdot$ Pol Llinàs \\
+        \vspace{0.5cm}
+        \small \textcolor{gray}{May 2026 $\cdot$ Real-Time Monitoring & Scaling Validation}
+    \end{center}
 \end{frame}
-}
 
 % Slide 2: Executive Summary
-\begin{frame}{Executive Summary}
+\begin{frame}{Project Overview}
     \begin{columns}
         \begin{column}{0.6\textwidth}
+            \textbf{TrashUQ} is an end-to-end platform for intelligent waste monitoring.
             \begin{itemize}
-                \item \textbf{TrashUQ} is an end-to-end platform for real-time trash classification monitoring.
-                \item Integrates \textbf{Edge AI} on Arduino-class nodes with \textbf{Federated Learning} (FL).
-                \item Combines MQTT telemetry, gRPC coordination, and a live Next.js dashboard.
-                \item Successfully validated in a multi-node deployment with monotonic model versioning.
+                \item \textbf{Decentralized Training}: Federated Learning at the Edge.
+                \item \textbf{Real-Time Pipeline}: MQTT telemetry & WebSocket dashboard.
+                \item \textbf{Robust Persistence}: PostgreSQL storage of every event.
+                \item \textbf{Validated Hardware}: Deployed on Arduino-class MPU nodes.
             \end{itemize}
         \end{column}
         \begin{column}{0.4\textwidth}
-            \begin{tcolorbox}[colback=TrashBlue!10,colframe=TrashBlue,title=Key Features]
+            \begin{tcolorbox}[colback=TrashTeal!10,colframe=TrashTeal,title=Core Stack]
                 \small
                 \begin{itemize}
-                    \item Real-time Observability
-                    \item Scalable FL Coordinator
-                    \item Concurrency Control
-                    \item TFLite Material Classification
+                    \item \textbf{Backend}: FastAPI & gRPC
+                    \item \textbf{Edge}: TFLite & Python
+                    \item \textbf{Dashboard}: Next.js
+                    \item \textbf{Broker}: Mosquitto
                 \end{itemize}
             \end{tcolorbox}
         \end{column}
     \end{columns}
 \end{frame}
 
-% Slide 3: The Architecture (Visualized)
+% Slide 3: System Architecture (The "Real" Implementation)
 \begin{frame}{System Architecture}
     \begin{center}
-        \includegraphics[width=0.85\textwidth]{presentation_assets/architecture.png}
+        \includegraphics[width=0.85\textwidth]{presentation_assets/architecture_perfect.png}
     \end{center}
-    \centering \small \textit{A three-stage pipeline: Edge Intelligence $\rightarrow$ Connectivity $\rightarrow$ Central Analysis}
+    \centering \small \textit{Three-Stage Pipeline: Edge Devices $\rightarrow$ Connectivity $\rightarrow$ Deployable Stack}
 \end{frame}
 
-% Slide 4: Edge Intelligence & Classification
-\begin{frame}{Edge Intelligence}
+% Slide 4: Edge Intelligence
+\begin{frame}{Edge Node Intelligence}
     \begin{columns}
         \begin{column}{0.5\textwidth}
-            \textbf{On-Device Inference}
+            \textbf{Device Layer}
             \begin{itemize}
-                \item Powered by \textbf{TensorFlow Lite (TFLite)}.
-                \item Specialized for Arduino-class devices (UNO Q MPU).
-                \item High-fidelity material classification.
+                \item \textbf{Hardware}: UNO Q MPU (Arduino-class).
+                \item \textbf{Runtime}: TFLite-based material classification.
+                \item \textbf{Simulator}: Full-fidelity reproducible demo mode.
             \end{itemize}
         \end{column}
         \begin{column}{0.5\textwidth}
-            \textbf{Material Categories}
+            \textbf{Classification Path}
             \begin{itemize}
-                \item \textcolor{TrashBlue}{Cardboard}
-                \item \textcolor{TrashBlue}{Glass}
-                \item \textcolor{TrashBlue}{Paper}
-                \item \textcolor{TrashBlue}{Plastic}
+                \item \textcolor{TrashTeal}{Cardboard}
+                \item \textcolor{TrashTeal}{Glass}
+                \item \textcolor{TrashTeal}{Paper}
+                \item \textcolor{TrashTeal}{Plastic}
             \end{itemize}
-            \textit{Real-time performance: <100ms inference on edge hardware.}
+            \textit{Telemetery: Published via MQTT topics.}
         \end{column}
     \end{columns}
 \end{frame}
 
-% Slide 5: Telemetry & Connectivity
-\begin{frame}{Connectivity & Telemetry}
+% Slide 5: Connectivity: MQTT & gRPC
+\begin{frame}{The Communication Backbone}
     \begin{columns}
         \begin{column}{0.6\textwidth}
+            \textbf{MQTT Telemetry}
             \begin{itemize}
-                \item \textbf{MQTT Protocol}: Lightweight pub/sub for real-time telemetry (status, metrics, events).
-                \item \textbf{gRPC}: High-performance binary protocol for Federated Learning coordination.
-                \item \textbf{Persistence}: PostgreSQL stores every message with full payload fidelity.
+                \item Real-time status, metrics, and classification streams.
+                \item Low-bandwidth, high-reliability pub/sub.
+            \end{itemize}
+            \vspace{0.3cm}
+            \textbf{gRPC Coordination}
+            \begin{itemize}
+                \item High-performance binary RPC for model weight transfer.
+                \item Concurrency-safe: Rejects stale updates during rounds.
             \end{itemize}
         \end{column}
         \begin{column}{0.4\textwidth}
-            \begin{tcolorbox}[colback=TrashDark!10,colframe=TrashDark,title=Data Integrity]
+            \begin{tcolorbox}[colback=TrashDarkBlue!10,colframe=TrashDarkBlue,title=Data Flow]
                 \small
-                \begin{itemize}
-                    \item Monotonic versioning
-                    \item Stale update rejection
-                    \item 0\% dropped messages in validation
-                \end{itemize}
+                \texttt{arduino/+/\#} $\rightarrow$ Backend $\rightarrow$ PostgreSQL $\rightarrow$ Dashboard
             \end{tcolorbox}
         \end{column}
     \end{columns}
 \end{frame}
 
-% Slide 6: Federated Learning Coordinator
-\begin{frame}{Federated Learning (FL) Lifecycle}
+% Slide 6: Federated Learning (FL) scaling
+\begin{frame}{Federated Learning Scaling}
     \begin{center}
-    \begin{tikzpicture}[node distance=2cm, auto]
-        \node (Join) [draw, rounded corners, fill=TrashBlue!20] {Join Round};
-        \node (Get) [right of=Join, node distance=3.5cm, draw, rounded corners, fill=TrashAccent!20] {Get Global Model};
-        \node (Train) [right of=Get, node distance=3.5cm, draw, rounded corners, fill=TrashBlue!20] {Local Training};
-        \node (Submit) [right of=Train, node distance=3.5cm, draw, rounded corners, fill=TrashAccent!20] {Submit Update};
-        \draw [->, thick] (Join) -- (Get);
-        \draw [->, thick] (Get) -- (Train);
-        \draw [->, thick] (Train) -- (Submit);
-    \end{tikzpicture}
+        \includegraphics[width=0.85\textwidth]{presentation_assets/fl_scaling.png}
     \end{center}
-    \vspace{0.5cm}
+    \centering \small \textit{FedAvg Validation: Scalability study across 2, 5, 10, and 20 clients.}
+\end{frame}
+
+% Slide 7: Live Dashboard Monitoring
+\begin{frame}{Next.js Live Dashboard}
+    \begin{center}
+        \includegraphics[width=0.8\textwidth]{presentation_assets/dashboard.png}
+    \end{center}
+    \centering \small \textit{Bootstrap + MQTT WebSockets: Real-time charts and device summaries.}
+\end{frame}
+
+% Slide 8: Validation Highlights (Part A)
+\begin{frame}{Part A: Deployed Validation}
     \begin{itemize}
-        \item \textbf{FedAvg Aggregation}: Weighted averaging based on sample count.
-        \item \textbf{Coordination}: Handled via gRPC \texttt{SubmitUpdate} workflows.
-        \item \textbf{Stability}: Proven convergence under Non-IID data partitions.
+        \item \textbf{Infrastructure}: 2 nodes (\texttt{unoq-01}, \texttt{unoq-02}) on \texttt{bepes-server}.
+        \item \textbf{Persistence}: 282 MQTT messages stored with full fidelity.
+        \item \textbf{Monotonicity}: Advanced \texttt{model\_version} from 0 to 26 over 26 rounds.
+        \item \textbf{Reliability}: 0\% invalid payloads, 0\% dropped messages.
     \end{itemize}
-\end{frame}
-
-% Slide 7: Live Dashboard
-\begin{frame}{Live Monitoring Dashboard}
     \begin{center}
-        \includegraphics[width=0.85\textwidth]{presentation_assets/dashboard.png}
+        \begin{table}
+            \small
+            \begin{tabular}{|l|c|c|}
+            \hline
+            \textbf{Node} & \textbf{Messages} & \textbf{Mean Accuracy} \\ \hline
+            unoq-01 & 147 & 92.1\% \\ \hline
+            unoq-02 & 135 & 87.1\% \\ \hline
+            \end{tabular}
+        \end{table}
     \end{center}
-    \centering \small \textit{Next.js Dashboard: Real-time charts, device status, and FL progress streams.}
-\end{frame}
-
-% Slide 8: Validation Results (Part A)
-\begin{frame}{Validation Highlights (Part A)}
-    \begin{columns}
-        \begin{column}{0.5\textwidth}
-            \begin{itemize}
-                \item \textbf{Deployment}: 2 Arduino nodes on \texttt{bepes-server}.
-                \item \textbf{Activity}: 282 MQTT messages persisted.
-                \item \textbf{Progress}: 26 FL rounds completed.
-                \item \textbf{Success}: Model version advanced from 0 to 26.
-            \end{itemize}
-        \end{column}
-        \begin{column}{0.5\textwidth}
-            \begin{table}
-                \centering
-                \begin{tabular}{|l|r|}
-                \hline
-                \textbf{Metric} & \textbf{Value} \\ \hline
-                Aggregation Success & 83.3\% \\ \hline
-                Invalid Payload Rate & 0\% \\ \hline
-                Dashboard Lag & < 1s \\ \hline
-                Median Latency & $\sim$25ms \\ \hline
-                \end{tabular}
-            \end{table}
-        \end{column}
-    \end{columns}
 \end{frame}
 
 % Slide 9: Scalability Study (Part B)
-\begin{frame}{Scalability & Performance (Part B)}
+\begin{frame}{Part B: Scaling Performance}
     \begin{itemize}
-        \item \textbf{Experiment}: Evaluated scaling from 2 to 20 clients.
-        \item \textbf{Data}: Dirichlet Non-IID partitioning ($\alpha=0.3$).
-        \item \textbf{Accuracy}: Maintained \textbf{93-94\% accuracy} across all scales.
-        \item \textbf{Efficiency}: Communication cost scaled linearly with client count.
+        \item \textbf{Experiment}: FedAvg scaling study (2 to 20 clients).
+        \item \textbf{Condition}: Non-IID Dirichlet partitioning ($\alpha=0.3$).
+        \item \textbf{Convergence}: Stable convergence with \textbf{93-94\% final accuracy}.
+        \item \textbf{Efficiency}: predictable linear growth in communication cost.
     \end{itemize}
     \begin{center}
-    \begin{tcolorbox}[colback=TrashBlue!5,colframe=TrashBlue, width=0.7\textwidth]
-        \centering \small \textbf{Result:} Stable convergence even under highly heterogeneous data.
-    \end{tcolorbox}
+        \begin{tcolorbox}[colback=TrashTeal!5,colframe=TrashTeal, width=0.8\textwidth]
+            \centering \textbf{Conclusion}: System maintains high performance at scale under heterogeneous data.
+        \end{tcolorbox}
     \end{center}
 \end{frame}
 
-% Slide 10: Conclusion & Roadmap
-\begin{frame}{Conclusion \& Future Roadmap}
+% Slide 10: Conclusion & Acknowledgments
+\begin{frame}{Summary & Team}
     \begin{columns}
         \begin{column}{0.5\textwidth}
-            \textbf{Achievements}
+            \textbf{TrashUQ Success}
             \begin{itemize}
-                \item Proven edge-to-cloud FL pipeline.
-                \item Robust concurrency and persistence.
-                \item Deployed hardware validation.
+                \item Full edge-to-cloud integration.
+                \item Validated FL coordinator.
+                \item Real-time dashboard.
             \end{itemize}
         \end{column}
         \begin{column}{0.5\textwidth}
-            \textbf{Future Directions}
+            \textbf{The Team}
             \begin{itemize}
-                \item Production authentication & IAM.
-                \item Fleet management for 100+ nodes.
-                \item Advanced FL analytics & Differential Privacy.
+                \item Aleix Bertran Andreu
+                \item Aleix Rosinach
+                \item Bru
+                \item Pol Llinàs
             \end{itemize}
         \end{column}
     \end{columns}
-\end{frame}
-
-% Slide 11: Team
-\begin{frame}{The TrashUQ Team}
-    \begin{center}
-        \Huge \textbf{Thank You!} \\
-        \vspace{1cm}
-        \large
-        Aleix Bertran Andreu \quad Aleix Rosinach \\
-        Bru \quad Pol Llinàs
-    \end{center}
+    \vspace{1cm}
+    \centering \Huge \textbf{Thank You!}
 \end{frame}
 
 \end{document}
