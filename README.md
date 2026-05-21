@@ -428,6 +428,27 @@ flowchart LR
 
 The backend exposes a gRPC FL coordinator on port `50051`. Clients interact through `Join`, `GetGlobalModel` and `SubmitUpdate`, while the coordinator tracks rounds, model versions, submitted updates and aggregation state.
 
+### Model Aggregation (FedAvg)
+
+To merge client updates into a updated global model, TrashUQ implements the standard **Federated Averaging (FedAvg)** algorithm. The global model's weights at the next round $t+1$ (denoted as $w_{t+1}$) are calculated as:
+
+$$w_{t+1} = \sum_{k \in S_t} \frac{n_k}{N_t} w_t^k$$
+
+where the total number of training samples across all participating clients in round $t$ is:
+
+$$N_t = \sum_{j \in S_t} n_j$$
+
+**Variable Definitions:**
+- **$t$ (Round Number)**: The current communication round.
+- **$w_{t+1}$ (Aggregated Global Model Weights)**: The resulting global model parameters sent to all clients to start the next training round.
+- **$S_t$ (Active Clients Set)**: The set of clients participating in round $t$.
+- **$k$ (Client Index)**: A specific client ($k \in S_t$) participating in the round.
+- **$w_t^k$ (Local Model Weights)**: The local model weights submitted by client $k$ after performing local training in round $t$.
+- **$n_k$ (Local Sample Count)**: The number of training samples available on client $k$'s local dataset.
+- **$N_t$ (Total Active Samples)**: The sum of all training samples across all active participating clients in round $t$.
+- **$\frac{n_k}{N_t}$ (Aggregation Weight)**: The relative weight or influence given to client $k$'s update.
+
+
 The deployed Arduino-class validation executed 26 FL rounds and 25 successful aggregations. The coordinator progressed `model_version` monotonically from 0 to 26. During concurrent submission, stale updates were rejected correctly, demonstrating monotonic model-versioning and concurrency-safe FL coordination.
 
 Part B complements the deployed validation with FedAvg scalability experiments at 2, 5, 10 and 20 clients under non-IID partitions.
