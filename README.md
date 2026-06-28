@@ -162,7 +162,7 @@ TrashUQ/
   frontend/                        # Next.js dashboard
   mqtt/                            # Mosquitto broker config
   edge/                            # edge runtime, FL client, model runtime, tests, benchmarks
-  experiments/part_b/              # FL scalability experiment runner
+  experiments/fl_simulation/       # FL scalability experiment runner
   artifacts/part_b/latest/         # generated metrics, figures, and logs
   docs/assets/readme/              # README diagrams and screenshots
   docs/demos/mockups/              # internal/demo MQTT + gRPC simulation scripts
@@ -639,6 +639,22 @@ Summary from `table_b2_convergence_summary.csv`:
 | 20 | 93.75% | 0.1933 | Stable convergence under Dirichlet non-IID partitioning |
 
 `table_b3_efficiency_cost.csv` reports total messages increasing from `100` at 2 clients to `1000` at 20 clients, with combined sent/received traffic increasing from about `0.394 MB` to about `3.941 MB`.
+
+### Communication-Efficient FL — Method Comparison
+
+Beyond raw FedAvg scalability, `experiments/fl_simulation/compare_methods.py` benchmarks stochastic rounding (SR) quantization against Top-k sparsification on synthetic non-IID TrashNet data:
+
+| Method | Compression | Acc drop vs float32 | Communication savings |
+| --- | ---: | ---: | ---: |
+| float32 (baseline) | 1.0x | — | — |
+| SR-8bit | 4.0x | ~0 p.p. | ~37% |
+| SR-6bit | 5.33x | ~0 p.p. | ~37% |
+| SR-4bit | 8.0x | ~2 p.p. | ~44% |
+| Top-50% | 2.0x | ~3 p.p. | None |
+| Top-10% | 10.0x | ~21 p.p. | ~40% |
+| Top-1% | 100.0x | ~45 p.p. | ~49% |
+
+**Key finding**: SR-6bit preserves accuracy within noise of float32 while reducing communication by ~37%, offering the best accuracy/compression tradeoff. Top-k sparsification, even at modest 50% sparsity, incurs measurable accuracy loss.
 
 ## Troubleshooting
 
