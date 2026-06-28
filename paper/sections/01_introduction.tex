@@ -1,0 +1,47 @@
+% This file is input by the main document. Do not add \begin or \end.
+
+Waste mismanagement poses critical environmental and public health
+challenges. Intelligent waste sorting systems powered by deep learning can
+significantly improve recycling rates, but conventional approaches rely on
+centralized cloud infrastructure that raises privacy, latency, and bandwidth
+concerns~\cite{mcmahan2017fedavg}. Federated Learning (FL) addresses these
+limitations by training models collaboratively across edge devices while
+keeping data local~\cite{li2020fedavg,kairouz2021fl}.
+
+Several communication-efficient FL strategies have been proposed. Gradient
+sparsification (Top-k~\cite{aji2017topk}) keeps the largest-magnitude updates
+and zeros the rest, but requires transmitting integer indices alongside values,
+so its byte savings materialize only at very low keep ratios---which degrade
+accuracy. Stochastic quantization (QSGD~\cite{alistarh2017qsgd}) and 1-bit
+sign compression (SignSGD~\cite{bernstein2018signsgd}) compress each update
+uniformly without index overhead. Unified frameworks
+(FedCOM~\cite{haddadpour2021fedcom}) combine both ideas. Hierarchical
+FL~\cite{liu2020hierarchical,abad2020hierarchical} reduces coordinator load
+through multi-level aggregation, but adds topology complexity unsuitable for
+flat classroom-scale deployments. Despite their theoretical promise, most
+evaluations remain purely simulated on high-end hardware, leaving open
+questions about practical deployment on resource-constrained boards. The
+Arduino UNO Q---featuring a Qualcomm QRB2210 processor---enables such a
+deployment, and we adopt stochastic rounding quantization because it
+introduces no hyperparameter tuning at the edge and integrates directly with
+TFLite delegates.
+
+This paper presents TrashUQ, a complete FL-based waste monitoring system
+deployed on two Arduino UNO Q boards. Our contributions are:
+\begin{enumerate}
+  \item A real two-node FL deployment with MQTT telemetry validation,
+  confirming end-to-end FL round-trip behavior (282 records, 25/30 successful
+  aggregations).
+  \item FL simulation results on a controlled synthetic dataset with FedAvg
+  across 2--20 non-IID clients, demonstrating stable convergence around
+  93--94\% accuracy and robustness across
+  $\alpha \in \{0.1, 0.3, 0.5, 1.0\}$.
+  \item Stochastic rounding gradient quantization evaluated at four precision
+  levels (2, 4, 6, 8~bits), achieving 4--16$\times$ model compression with
+  accuracy loss below 2.84~p.p.\ at 20 clients, and compared against Top-k
+  sparsification, where stochastic rounding saves 37--44\% of communication
+  with zero accuracy loss while Top-k either saves nothing or degrades
+  accuracy by 9+~p.p.
+  \item Open-source implementation at
+  \url{https://github.com/TrashUQ/TrashUQ}~\cite{trashuqrepo}.
+\end{enumerate}
