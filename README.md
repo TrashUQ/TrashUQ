@@ -640,13 +640,13 @@ Summary from `table_b2_convergence_summary.csv`:
 
 `table_b3_efficiency_cost.csv` reports total messages increasing from `100` at 2 clients to `1000` at 20 clients, with combined sent/received traffic increasing from about `0.394 MB` to about `3.941 MB`.
 
-### Communication-Efficient FL — Method Comparison
+### Communication-Efficient FL - Method Comparison
 
 Beyond raw FedAvg scalability, `experiments/fl_simulation/compare_methods.py` benchmarks stochastic rounding (SR) quantization against Top-k sparsification on synthetic non-IID TrashNet data:
 
 | Method | Compression | Acc drop vs float32 | Communication savings |
 | --- | ---: | ---: | ---: |
-| float32 (baseline) | 1.0x | — | — |
+| float32 (baseline) | 1.0x | - | - |
 | SR-8bit | 4.0x | ~0 p.p. | ~37% |
 | SR-6bit | 5.33x | ~0 p.p. | ~37% |
 | SR-4bit | 8.0x | ~2 p.p. | ~44% |
