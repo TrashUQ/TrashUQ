@@ -1,0 +1,73 @@
+\documentclass{IOS-Book-Article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{mathptmx}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{url}
+
+\def\hb{\hbox to 11.5 cm{}}
+
+\begin{document}
+
+\pagestyle{headings}
+\def\thepage{}
+\begin{frontmatter}
+
+\title{TrashUQ: Federated Learning for Intelligent Waste Monitoring on Arduino UNO Q}
+
+\markright{}{}
+
+\author[a]{\fnms{Aleix} \snm{Bertran Andreu}}
+\author[A]{\fnms{Pol} \snm{Llin\`as Vaquer}}
+\author[A]{\fnms{Bru} \snm{Pall\`as Vargu\'es}}
+\author[A]{\fnms{Aleix} \snm{Rosinach Olivart}}
+
+\runningauthor{TrashUQ Team}
+
+\address[A]{Universitat de Lleida, Lleida, Catalonia}
+
+\begin{abstract}
+This paper presents TrashUQ, a waste-monitoring platform that integrates Arduino UNO Q edge nodes, MQTT telemetry, and a gRPC Federated Learning (FL) coordinator. We report two validations. First, a real two-device deployment confirms end-to-end telemetry and FL round-trip behavior (282 persisted MQTT records, model version 0$\rightarrow$26, 25/30 successful aggregations). Second, a controlled non-IID FL simulation (Dirichlet $\alpha=0.3$) with 2, 5, 10, and 20 clients shows stable FedAvg convergence over 25 rounds, with final accuracies around 93--94\%. We further demonstrate that stochastic rounding gradient quantization achieves 4--8$\times$ model compression with negligible accuracy degradation (0--1.33\%). Results indicate that FL orchestration is feasible on this embedded stack, and that gradient quantization effectively mitigates the communication bottleneck.
+\end{abstract}
+
+\begin{keyword}
+Federated Learning\sep Edge AI\sep Waste Classification\sep
+Arduino UNO Q\sep MQTT\sep TrashNet
+\end{keyword}
+\end{frontmatter}
+\markboth{TrashUQ: FL for Waste Monitoring on Arduino UNO Q}{TrashUQ: FL for Waste Monitoring on Arduino UNO Q}
+
+\section{Introduction}
+\label{sec:introduction}
+\input{sections/01_introduction}
+
+\section{Related Work}
+\label{sec:related}
+\input{sections/00_related_work}
+
+\section{System Architecture}
+\label{sec:architecture}
+\input{sections/02_architecture}
+
+\section{Hardware Validation}
+\label{sec:hardware}
+\input{sections/03_hardware_validation}
+
+\section{FL Simulation and Communication Efficiency}
+\label{sec:fl_simulation}
+\input{sections/04_fl_simulation}
+
+\section{Conclusion and Future Work}
+\label{sec:conclusion}
+\input{sections/05_conclusion}
+
+\section*{Acknowledgements}
+The authors thank Jordi Planes Cid from the Universitat de Lleida for guidance and support during this work.
+
+\bibliographystyle{vancouver}
+\bibliography{references}
+
+\end{document}

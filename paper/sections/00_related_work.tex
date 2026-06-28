@@ -1,0 +1,26 @@
+% Related Work - Communication-Efficient Federated Learning
+% This file is input by the main document. Do not add \begin or \end.
+
+Communication efficiency is a central challenge in federated learning,
+where the cost of transmitting model updates between clients and the server
+can dominate training time~\cite{kairouz2021fl}. Several compression
+strategies have been proposed to mitigate this bottleneck.
+
+Alistarh et al.~\cite{alistarh2017qsgd} introduced QSGD, which combines
+stochastic gradient quantization with unbiased encoding to achieve convergence
+guarantees under bounded variance. Bernstein et al.~\cite{bernstein2018signsgd}
+proposed SignSGD, where only the sign of each gradient is communicated,
+enabling 1-bit compression with majority-vote aggregation. Haddadpour et
+al.~\cite{haddadpour2021fedcom} developed FedCOM, providing a unified analysis
+of compressed FL with periodic communication and local gradient tracking.
+Top-k sparsification~\cite{aji2017topk} further reduces communication by
+transmitting only the largest gradient components. Hierarchical FL
+approaches~\cite{liu2020hierarchical,abad2020hierarchical} introduce
+multi-level aggregation to reduce coordinator load in large-scale deployments.
+
+However, most prior work evaluates these techniques exclusively in simulation
+environments with high-end hardware, leaving open questions about their
+applicability to resource-constrained edge deployments. In this work, we
+implement stochastic rounding quantization within a simulated FedAvg pipeline
+and validate it on synthetic non-IID partitions, bridging the gap between
+theoretical compression and practical edge deployment.

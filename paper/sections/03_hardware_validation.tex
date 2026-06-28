@@ -1,0 +1,12 @@
+The hardware validation was executed on May 16, 2026, using two Arduino UNO Q nodes connected to a shared backend stack (MQTT broker, PostgreSQL, REST API, dashboard, and gRPC FL coordinator). Both nodes ran on Debian 13 and used the same edge daemon, topic contract, and FL client API.
+
+\subsection{Protocol Validation and Persistence}
+We validated end-to-end ingestion for both devices across the path Edge $\rightarrow$ MQTT $\rightarrow$ Backend $\rightarrow$ PostgreSQL $\rightarrow$ Frontend. During a $\sim$12-minute run, the system persisted 282 MQTT rows in total: 147 from \texttt{unoq-01} and 135 from \texttt{unoq-02}. Per-device topic counts were 27/21 status messages, 16/14 metric messages, and 104/100 event messages, respectively.
+
+\subsection{FL Round-Trip Behavior on Real Nodes}
+Both nodes successfully completed FL handshake and training-update cycles with the coordinator (\texttt{Join}, \texttt{GetGlobalModel}, \texttt{SubmitUpdate}). The experiment reached model version 26, with 25 successful aggregations out of 30 submissions (83.3\% aggregation success). Five submissions were rejected as stale during concurrent updates, confirming that coordinator-side monotonic round checks were enforced correctly.
+
+Round submission latency (from local training completion to update submission) was low (median $\sim$25\,ms, max 105\,ms). Mean local metrics were 0.921 accuracy / 0.236 loss for \texttt{unoq-01}, and 0.871 accuracy / 0.311 loss for \texttt{unoq-02}.
+
+\subsection{Operational Limitations}
+Both devices used \texttt{--fake-camera} and HTTP label injection to exercise FL deterministically. Therefore, camera-in-the-loop inference latency and classification-topic throughput were not measured in this run.

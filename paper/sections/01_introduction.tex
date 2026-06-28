@@ -1,0 +1,31 @@
+% This file is input by the main document. Do not add \begin or \end.
+
+Waste mismanagement poses critical environmental and public health
+challenges. Intelligent waste sorting systems powered by deep learning can
+significantly improve recycling rates, but conventional approaches rely on
+centralized cloud infrastructure that raises privacy, latency, and bandwidth
+concerns~\cite{mcmahan2017fedavg}. Federated Learning (FL) addresses these
+limitations by training models collaboratively across edge devices while
+keeping data local~\cite{li2020fedavg,kairouz2021fl}.
+
+Recent works have shown mature FL methods and system-level considerations for heterogeneous environments~\cite{kairouz2021fl}. However, most existing
+solutions focus on simulation-based evaluation and lack validation on real
+heterogeneous hardware. The availability of low-cost edge AI platforms such as
+the Arduino UNO Q---featuring a Qualcomm QRB2210 processor and an STM32U585
+co-processor---enables practical FL deployment on physical devices.
+
+This paper presents TrashUQ, a complete FL-based waste monitoring system
+deployed on two Arduino UNO Q boards with heterogeneous roles. Our
+contributions are:
+
+\begin{enumerate}
+  \item A real FL deployment on two Arduino UNO Q boards, including a
+  camera-equipped capture-and-classify node and a compute-only FL participant,
+  with multi-node telemetry validation and FL round-trip timing.
+  \item FL simulation results on a controlled synthetic TrashNet-style dataset
+  with FedAvg across 2, 5, 10, and 20 non-IID clients, demonstrating
+  convergence behavior and communication efficiency.
+  \item An open-source implementation of the complete FL pipeline, from
+  on-device fine-tuning to MQTT telemetry, publicly available at
+  \url{https://github.com/TrashUQ/TrashUQ}~\cite{trashuqrepo}.
+\end{enumerate}

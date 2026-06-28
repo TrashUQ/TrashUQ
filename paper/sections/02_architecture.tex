@@ -1,0 +1,17 @@
+\subsection{Hardware Platform}
+
+Each Arduino UNO Q has a Qualcomm QRB2210 application processor (Debian Linux) and an STM32U585 microcontroller. Boards connect to the backend over Wi-Fi.
+
+\subsection{Edge Software Pipeline}
+
+The edge daemon follows capture/classify/act logic. Classification uses a MobileNetV2 TFLite model ($224\times224$, classes: cardboard, glass, paper, plastic). User corrections are stored locally and used for on-device fine-tuning.
+
+\subsection{Federated Learning Pipeline}
+
+The trainable model is a frozen MobileNetV2 backbone with a small learnable head. After accumulating new labels, a node starts an FL round: it fetches global weights, trains locally, and submits an update via gRPC. The coordinator applies FedAvg~\cite{mcmahan2017fedavg}.
+
+\subsection{MQTT Telemetry and Backend}
+
+Boards publish status/events/FL metrics to \texttt{arduino/<device-id>/\#}. A FastAPI backend persists telemetry in PostgreSQL and exposes the FL coordinator. A Next.js dashboard provides real-time monitoring via MQTT over WebSocket.
+Code and deployment artifacts are available at
+\url{https://github.com/TrashUQ/TrashUQ}.

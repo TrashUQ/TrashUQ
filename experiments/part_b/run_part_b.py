@@ -139,6 +139,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--learning-rate", type=float, default=0.18)
     parser.add_argument("--alpha", type=float, default=0.3)
+    parser.add_argument("--quantization-bits", type=int, default=0, help="Bits for stochastic quantization (0 = off, 8 = 8-bit, 4 = 4-bit).")
     parser.add_argument("--optimizer", default="SGD")
     parser.add_argument("--synthetic-samples-per-class", type=int, default=220)
     parser.add_argument("--synthetic-seed", type=int, default=20260517)
@@ -421,6 +422,45 @@ def weighted_average(models: list[np.ndarray], sample_counts: list[int]) -> np.n
     return accumulator.astype(np.float32)
 
 
+def quantize_stochastic(
+    weights: np.ndarray, bits: int = 8
+) -> tuple[np.ndarray, float, float]:
+    min_val = weights.min()
+    max_val = weights.max()
+    scale = (2**bits - 1) / (max_val - min_val + 1e-12)
+    scaled = (weights - min_val) * scale
+    floor = np.floor(scaled).astype(np.int32)
+    residual = scaled - floor
+    rng = np.random.default_rng()
+    quantized = np.where(
+        rng.random(weights.shape) < residual, floor + 1, floor
+    ).astype(np.int32)
+    if bits <= 4:
+        flat = quantized.reshape(-1).astype(np.uint8)
+        if len(flat) % 2:
+            flat = np.append(flat, np.uint8(0))
+        packed = (flat[::2] | (flat[1::2] << 4)).astype(np.uint8)
+        return packed, float(min_val), float(scale)
+    if bits <= 8:
+        return quantized.astype(np.uint8), float(min_val), float(scale)
+    if bits <= 16:
+        return quantized.astype(np.uint16), float(min_val), float(scale)
+    return quantized.astype(np.int32), float(min_val), float(scale)
+
+
+def dequantize(
+    quantized: np.ndarray, min_val: float, scale: float, bits: int = 8
+) -> np.ndarray:
+    if bits <= 4:
+        lo = (quantized & 0x0F).astype(np.float32)
+        hi = ((quantized >> 4) & 0x0F).astype(np.float32)
+        unpacked = np.empty(quantized.shape[0] * 2, dtype=np.float32)
+        unpacked[0::2] = lo
+        unpacked[1::2] = hi
+        return unpacked / scale + min_val
+    return quantized.astype(np.float32) / scale + min_val
+
+
 def confidence_interval(values: list[float]) -> tuple[float, float, float, float]:
     avg = mean(values)
     if len(values) == 1:
@@ -529,11 +569,20 @@ def run_experiment(
                 failed_rounds += 1
                 data_corruption_events += 1
                 continue
-            local_models.append(local_model)
             sample_counts.append(int(len(sample_idx)))
             local_losses.append(local_loss)
             local_accuracies.append(local_acc)
-            bytes_received += int(local_model.nbytes) + 24
+            if args.quantization_bits > 0:
+                q_weights, q_min, q_scale = quantize_stochastic(
+                    local_model, args.quantization_bits
+                )
+                q_bytes = int(q_weights.nbytes) + 8
+                bytes_received += q_bytes + 24
+                received_model = dequantize(q_weights, q_min, q_scale, args.quantization_bits)
+                local_models.append(received_model)
+            else:
+                bytes_received += int(local_model.nbytes) + 24
+                local_models.append(local_model)
             messages_received += 1
 
         if not local_models:
@@ -1139,6 +1188,7 @@ def main() -> None:
             "batch_size": args.batch_size,
             "learning_rate": args.learning_rate,
             "alpha": args.alpha,
+            "quantization_bits": args.quantization_bits,
             "optimizer": args.optimizer,
         },
         "generated_at": datetime.now().isoformat(),

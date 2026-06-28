@@ -1,0 +1,62 @@
+\begin{thebibliography}{10}
+
+\bibitem{mcmahan2017fedavg}
+McMahan HB, Moore E, Ramage D, Hampson S, y~Arcas BA.
+\newblock Communication-Efficient Learning of Deep Networks from Decentralized
+  Data.
+\newblock In: Proceedings of the 20th International Conference on Artificial
+  Intelligence and Statistics (AISTATS); 2017. p. 1273-82.
+
+\bibitem{li2020fedavg}
+Li T, Sahu AK, Talwalkar A, Smith V.
+\newblock Federated Optimization in Heterogeneous Networks.
+\newblock In: Proceedings of Machine Learning and Systems (MLSys); 2020. .
+
+\bibitem{kairouz2021fl}
+Kairouz P, McMahan HB, Avent B, et~al.
+\newblock Advances and Open Problems in Federated Learning.
+\newblock Foundations and Trends in Machine Learning. 2021;14(1--2):1-210.
+
+\bibitem{trashuqrepo}
+Team T. TrashUQ Project Repository; 2026.
+\newblock \url{https://github.com/TrashUQ/TrashUQ}.
+
+\bibitem{alistarh2017qsgd}
+Alistarh D, Grubic D, Li J, Tomioka R, Vojnovic M.
+\newblock {QSGD}: Communication-Efficient {SGD} via Gradient Quantization and
+  Encoding.
+\newblock In: Advances in Neural Information Processing Systems (NeurIPS);
+  2017. p. 1709-20.
+
+\bibitem{bernstein2018signsgd}
+Bernstein J, Wang YX, Azizzadenesheli K, Anandkumar A.
+\newblock {signSGD}: Compressed Optimisation for Non-Convex Problems.
+\newblock In: Proceedings of the 35th International Conference on Machine
+  Learning (ICML). vol.~80. PMLR; 2018. p. 560-9.
+
+\bibitem{haddadpour2021fedcom}
+Haddadpour F, Kamani MM, Mokhtari A, Mahdavi M.
+\newblock Federated Learning with Compression: Unified Analysis and Sharp
+  Guarantees.
+\newblock IEEE Transactions on Information Theory. 2021;67(7):4750-76.
+
+\bibitem{aji2017topk}
+Aji AF, Heafield K.
+\newblock Sparse Communication for Distributed Gradient Descent.
+\newblock In: Proceedings of the Conference on Empirical Methods in Natural
+  Language Processing (EMNLP); 2017. p. 440-50.
+
+\bibitem{liu2020hierarchical}
+Liu L, Zhang J, Song SH, Letaief KB.
+\newblock Client-Edge-Cloud Hierarchical Federated Learning.
+\newblock In: IEEE International Conference on Communications (ICC); 2020. p.
+  1-6.
+
+\bibitem{abad2020hierarchical}
+Abad MSH, Ozfatura E, Gunduz D, Ercetin O.
+\newblock Hierarchical Federated Learning Across Heterogeneous Cellular
+  Networks.
+\newblock In: IEEE International Conference on Acoustics, Speech and Signal
+  Processing (ICASSP); 2020. p. 8866-70.
+
+\end{thebibliography}
