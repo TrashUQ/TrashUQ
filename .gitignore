@@ -38,6 +38,10 @@ artifacts/
 *.zip
 *.tar.gz
 
+# --- Environment files ---
+.env
+.envrc
+
 # --- OS files ---
 .DS_Store
 Thumbs.db
