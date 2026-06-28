@@ -685,8 +685,6 @@ Beyond raw FedAvg scalability, `experiments/fl_simulation/compare_methods.py` be
 
 This repository represents a research prototype validated through a deployed two-node Arduino-class experiment and controlled FL scalability experiments. The Part A run used controlled synthetic frames on the devices to focus on telemetry, persistence, dashboard synchronization and FL coordination. Production extensions include broader hardware benchmarking, authentication, long-term fleet management and larger real-world datasets.
 
-## License / Authors
+## License
 
-Developed as part of the TrashUQ Edge AI + Federated Learning project.
-
-The current edge repository includes an Mozilla Public License 2.0 license file. A top-level unified project license should be finalized when the repositories are merged.
+MIT License — see [LICENSE](LICENSE).
