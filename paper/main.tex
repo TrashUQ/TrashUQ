@@ -7,6 +7,7 @@
 \usepackage{booktabs}
 \usepackage{hyperref}
 \usepackage{url}
+\raggedbottom
 
 \def\hb{\hbox to 11.5 cm{}}
 
@@ -30,7 +31,7 @@
 \address[A]{Universitat de Lleida, Lleida, Catalonia}
 
 \begin{abstract}
-This paper presents TrashUQ, a waste-monitoring platform that integrates Arduino UNO Q edge nodes, MQTT telemetry, and a gRPC Federated Learning (FL) coordinator. We report two validations. First, a real two-device deployment confirms end-to-end telemetry and FL round-trip behavior (282 persisted MQTT records, model version 0$\rightarrow$26, 25/30 successful aggregations). Second, a controlled non-IID FL simulation (Dirichlet $\alpha=0.3$) with 2, 5, 10, and 20 clients shows stable FedAvg convergence over 25 rounds, with final accuracies around 93--94\%. We further demonstrate that stochastic rounding gradient quantization achieves 4--8$\times$ model compression with negligible accuracy degradation (0--1.33\%). Results indicate that FL orchestration is feasible on this embedded stack, and that gradient quantization effectively mitigates the communication bottleneck.
+This paper presents TrashUQ, a waste-monitoring platform that integrates Arduino UNO Q edge nodes, MQTT telemetry, and a gRPC Federated Learning (FL) coordinator. We report two validations. First, a real two-device deployment confirms end-to-end telemetry and FL round-trip behavior (282 persisted MQTT records, model version 0$\rightarrow$26, 25/30 successful aggregations). Second, a controlled non-IID FL simulation (Dirichlet $\alpha=0.3$) with 2, 5, 10, and 20 clients shows stable FedAvg convergence over 25 rounds, with final accuracies around 93--94\%. We further demonstrate that stochastic rounding gradient quantization achieves 4--16$\times$ model compression with accuracy loss below 2.84 p.p.\ at 20 clients, outperforming Top-k sparsification which either saves no communication or degrades accuracy by 9+~p.p. FL convergence is robust across a wide range of non-IID intensities ($\alpha = 0.1$--$1.0$). Results indicate that FL orchestration is feasible on this embedded stack, and that stochastic rounding is the preferred method for communication-constrained edge deployments.
 \end{abstract}
 
 \begin{keyword}
@@ -60,9 +61,10 @@ Arduino UNO Q\sep MQTT\sep TrashNet
 \label{sec:conclusion}
 \input{sections/05_conclusion}
 
-\section*{Acknowledgements}
+\vspace*{-2mm}\section*{Acknowledgements}
 The authors thank Jordi Planes Cid from the Universitat de Lleida for guidance and support during this work.
 
+\vspace*{-4mm}
 \bibliographystyle{vancouver}
 \bibliography{references}
 
