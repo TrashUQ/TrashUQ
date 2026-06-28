@@ -36,7 +36,6 @@ artifacts/
 
 # --- Generated archives ---
 *.zip
-!TRASHUQ_CCIA26.zip
 *.tar.gz
 
 # --- OS files ---
