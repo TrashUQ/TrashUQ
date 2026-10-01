@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 560" role="img" aria-labelledby="title desc">
+  <title id="title">Illustrated Arduino UNO Q board</title><desc id="desc">Isometric blue Arduino UNO Q edge-computing board with Qualcomm and STM32 chips.</desc>
+  <defs>
+    <linearGradient id="pcb" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#1b5b78"/><stop offset=".55" stop-color="#0b3855"/><stop offset="1" stop-color="#062b45"/></linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#092b43"/><stop offset="1" stop-color="#061e32"/></linearGradient>
+    <linearGradient id="chip" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#293943"/><stop offset="1" stop-color="#0a141c"/></linearGradient>
+    <filter id="shadow" x="-.25" y="-.25" width="1.6" height="1.7"><feGaussianBlur stdDeviation="13"/></filter>
+    <pattern id="vias" width="17" height="17" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="1.5" fill="#86c9c9" opacity=".55"/></pattern>
+  </defs>
+  <ellipse cx="380" cy="485" rx="275" ry="42" fill="#183c4b" opacity=".25" filter="url(#shadow)"/>
+  <g transform="translate(90 45) rotate(-5 290 210)">
+    <path d="M34 168 287 18l388 109-253 157Z" fill="url(#edge)" transform="translate(0 20)"/>
+    <path d="M34 168 287 18l388 109-253 157-388-109Z" fill="url(#pcb)" stroke="#75a9ae" stroke-width="4"/>
+    <path d="m55 168 233-137 354 100-231 142Z" fill="none" stroke="#6dc3bd" stroke-opacity=".45" stroke-width="2"/>
+    <path d="m95 170 175-103m-130 145 185-110m-75 145 193-115m-83 145 208-124" stroke="#65c8bd" stroke-opacity=".5" stroke-width="3" fill="none"/>
+    <path d="M50 171 285 33l360 101-232 143Z" fill="url(#vias)" opacity=".35"/>
+    <text x="72" y="155" fill="#e4ffef" font-family="monospace" font-size="20" font-weight="700" transform="rotate(-29 72 155)">ARDUINO</text>
+    <text x="170" y="105" fill="white" font-family="monospace" font-size="25" font-weight="700" transform="rotate(-29 170 105)">UNO Q</text>
+    <g transform="translate(245 112) rotate(16)"><rect width="130" height="92" rx="7" fill="url(#chip)" stroke="#95aeb2" stroke-width="3"/><path d="M12 14h106M12 22h106" stroke="#51656b"/><text x="14" y="51" fill="#8ed0c7" font-family="monospace" font-size="12">QUALCOMM</text><text x="14" y="71" fill="white" font-family="monospace" font-size="16" font-weight="700">QRB2210</text></g>
+    <g transform="translate(438 133) rotate(16)"><rect width="76" height="67" rx="6" fill="url(#chip)" stroke="#95aeb2" stroke-width="3"/><text x="10" y="28" fill="#8ed0c7" font-family="monospace" font-size="10">STM32</text><text x="10" y="47" fill="white" font-family="monospace" font-size="12" font-weight="700">U585</text></g>
+    <g transform="translate(164 188) rotate(-29)"><rect width="74" height="46" rx="4" fill="#f4f5ed" stroke="#a1b6ae" stroke-width="2"/><path d="M8 9h58M8 18h43M8 27h54" stroke="#74958f" stroke-width="2"/><text x="9" y="40" fill="#406266" font-family="monospace" font-size="8">EDGE AI</text></g>
+    <g fill="#d9bf5b" stroke="#fff1a5" stroke-width="1">
+      <path d="m74 107 74-43 10 3-75 44Z"/><path d="m82 136 74-43 10 3-75 44Z"/><path d="m477 73 91 26-7 8-91-26Z"/><path d="m493 103 91 26-7 8-91-26Z"/>
+    </g>
+    <g fill="#d3e4df" stroke="#607d82" stroke-width="2">
+      <path d="m35 164 24-14 13 4-24 15Z"/><path d="m590 287 25-15 14 4-25 15Z"/>
+    </g>
+    <g fill="#b7d5d2" stroke="#547e82" stroke-width="2"><rect x="17" y="147" width="24" height="39" rx="4" transform="rotate(-29 17 147)"/><rect x="630" y="113" width="28" height="40" rx="4" transform="rotate(16 630 113)"/></g>
+    <g fill="#e8d45b"><circle cx="106" cy="203" r="5"/><circle cx="123" cy="193" r="5"/></g><g fill="#ff826b"><circle cx="140" cy="183" r="5"/></g>
+    <text x="498" y="222" fill="#b9ebe0" font-family="monospace" font-size="12" transform="rotate(16 498 222)">EDGE COMPUTE / FEDAVG</text>
+  </g>
+</svg>
