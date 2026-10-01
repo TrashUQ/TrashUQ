@@ -7,7 +7,7 @@ Carpeta de proves per validar el flux real de l'app:
 ## Requisits
 
 ```bash
-pip install paho-mqtt grpcio
+pip install paho-mqtt==2.1.0 'grpcio>=1.80.0' 'protobuf>=6.31.1,<7'
 ```
 
 ## 1) Simular dispositius MQTT

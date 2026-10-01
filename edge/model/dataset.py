@@ -86,7 +86,7 @@ def build_dataset(
     shuffle: bool = False,
 ) -> tf.data.Dataset:
     paths = [str(p) for p, _ in items]
-    labels = [l for _, l in items]
+    labels = [label for _, label in items]
 
     ds = tf.data.Dataset.from_tensor_slices((paths, labels))
     if shuffle:

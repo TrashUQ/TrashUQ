@@ -4,6 +4,5 @@ SQLAlchemy==2.0.41
 psycopg[binary]==3.2.9
 pydantic-settings==2.9.1
 grpcio==1.80.0
-grpcio-tools==1.80.0
-
+protobuf>=6.31.1,<7
 paho-mqtt==2.1.0

@@ -14,7 +14,8 @@ def build_device_payload(device_id: str) -> dict:
         "temp": f"{random.uniform(25.0, 55.0):.1f}C",
         "heartbeat": "online",
         "mode": random.choice(["train", "idle", "inference"]),
-        "status": random.choice(["ok", "warning"]),
+        "status": "Online",
+        "online": True,
         "device_id": device_id,
     }
 
@@ -57,7 +58,15 @@ def main() -> None:
             )
 
             publish_json(client, f"{base}/event", {"msg": f"event {i} from {device_id}"})
-            publish_json(client, f"{base}/classification", {"class": random.choice(["plastic", "paper", "glass"])})
+            publish_json(
+                client,
+                f"{base}/classification",
+                {
+                    "label": random.choice(["cardboard", "glass", "paper", "plastic"]),
+                    "confidence": round(random.uniform(0.8, 0.99), 4),
+                    "bbox": None,
+                },
+            )
             publish_json(client, f"{base}/help", {"help": random.choice(["none", "bin_full", "sensor_error"])})
             publish_json(client, f"{base}/logs", {"log": f"loop {i} device {device_id}"})
 

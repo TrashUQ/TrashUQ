@@ -7,9 +7,7 @@ from __future__ import annotations
 
 import argparse
 import csv
-import math
 import sys
-import time
 from pathlib import Path
 
 import numpy as np
@@ -19,11 +17,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from run_part_b import (
     CLASSES,
     FEATURE_DIM,
-    DatasetBundle,
     compute_loss_and_accuracy,
     generate_synthetic_dataset,
     local_train,
-    params_to_vector,
     partition_dirichlet,
     quantize_stochastic,
     dequantize,
@@ -180,14 +176,12 @@ def run_comparison(args: argparse.Namespace) -> None:
         method_best = []
 
         for seed in args.seeds:
-            rng = np.random.default_rng(seed)
             partitions = partition_dirichlet(y_train, args.clients, args.alpha, seed)
             model_vector = np.zeros(FEATURE_DIM * num_classes + num_classes, dtype=np.float32)
             model_bytes = int(model_vector.nbytes)
 
             round_accs = []
             round_losses = []
-            total_bytes_round = 0
             total_comm = 0
 
             for round_idx in range(1, args.rounds + 1):
@@ -222,7 +216,6 @@ def run_comparison(args: argparse.Namespace) -> None:
                 total_comm += round_comm
 
             if round_accs:
-                avg_acc = sum(round_accs) / len(round_accs)
                 final_acc = round_accs[-1]
                 best_acc = max(round_accs)
                 method_accs.append(final_acc)
@@ -248,7 +241,7 @@ def run_comparison(args: argparse.Namespace) -> None:
 
     # ── Output comparison table ─────────────────────────────────────────────
     print("\n\n" + "=" * 120)
-    print("COMPARISON: Communication-Efficient FL Methods (20 clients, 25 rounds)")
+    print(f"COMPARISON: Communication-Efficient FL Methods ({args.clients} clients, {args.rounds} rounds)")
     print("=" * 120)
     print(f"{'Method':<12} {'Acc(%)':<10} {'Best(%)':<10} {'Comm(MB)':<12} {'Ratio':<12} {'Savings vs float32':<20} {'Acc drop vs float32':<20}")
     print("-" * 120)

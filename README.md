@@ -166,7 +166,16 @@ TrashUQ/
   artifacts/part_b/latest/         # generated metrics, figures, and logs
   docs/assets/readme/              # README diagrams and screenshots
   docs/demos/mockups/              # internal/demo MQTT + gRPC simulation scripts
+  paper/                          # academic report source, bibliography, and final PDF
+  poster/                         # A1 poster source, final PDF, and preview
+  poster-web/                     # public poster landing page (separate Next.js app)
 ```
+
+Final deliverables: [paper](paper/main.pdf), [A1 poster](poster/main.pdf),
+[poster preview](poster/preview.png), and [poster website instructions](poster-web/README.md).
+Generated experiment results under `artifacts/` are local and are not included in a fresh clone.
+See the [presentation checklist](docs/presentation-checklist.md) for verified
+checks, hardware rehearsal steps, and remaining production limitations.
 
 ## Services and Ports
 
@@ -185,11 +194,16 @@ Deployed validation server: `bepes-server`, `172.20.10.12`.
 
 ```sh
 cd .
-cp backend/.env.example backend/.env
+cp -n backend/.env.example backend/.env
 docker compose up --build
 ```
 
 If `backend/.env` already exists, keep it unless you intentionally want to reset local settings. Do not commit `.env`.
+
+The example uses the same database credentials as Compose. Compose substitutions
+come from the shell or a root `.env`, not `backend/.env`; use a root `.env` to
+override stack settings and keep `DATABASE_URL` consistent with the database.
+Existing PostgreSQL volumes retain their original credentials.
 
 Verify the backend:
 
@@ -214,11 +228,13 @@ cd .
 docker compose up --build
 ```
 
-Terminal 2: edge simulator
+Terminal 2: simulated MQTT devices (from the repository root)
 
 ```sh
 cd edge
-uv run python -m app.edge_simulator
+uv sync
+cd ..
+edge/.venv/bin/python docs/demos/mockups/scripts/mock_mqtt_publisher.py --devices 2 --loops 300
 ```
 
 Terminal 3: MQTT monitor
@@ -236,7 +252,7 @@ http://localhost:3000
 
 Expected result:
 
-- `unoq-01` appears online.
+- `uno-1` and `uno-2` appear online while the publisher runs.
 - CPU, RAM, heartbeat, mode and latest classification update.
 - Metrics update and charts populate from MQTT metric history.
 - Event/log/help/classification streams update from MQTT messages.
@@ -246,30 +262,17 @@ Expected result:
 
 | Mode | Command | Hardware required | Purpose |
 | --- | --- | --- | --- |
-| MQTT one-shot test | `uv run python scripts/test_mqtt_publish.py` | No | Validate all MQTT topics and payload shapes |
-| Simulator | `uv run python -m app.edge_simulator` | No | Live dashboard demo through the real pipeline |
-| gRPC validation | `uv run python scripts/test_fl_grpc.py` | No | Validate coordinator `Join` and `GetGlobalModel` |
-| Model load | `uv run python scripts/test_model_load.py` | Model deps | Validate TFLite interpreter/model loading |
-| Single-image inference | `EDGE_IMAGE_PATH=/path/to/image.jpg uv run python scripts/test_single_image_inference.py` | Image file + model deps | Validate classification on one image |
-| Camera open | `uv run python scripts/test_camera_open.py` | Camera | Validate OpenCV camera access |
-| Real runtime | `uv run python -m app.real_edge_runtime` | Camera, image, or video source | Publish real model/runtime telemetry to TrashUQ |
+| MQTT demo | `edge/.venv/bin/python docs/demos/mockups/scripts/mock_mqtt_publisher.py --devices 2 --loops 300` | No | Live dashboard demo (run from repository root) |
+| gRPC demo | `PYTHONPATH=backend edge/.venv/bin/python docs/demos/mockups/scripts/mock_fl_clients.py --clients 2 --rounds 3` | No | Exercise coordinator RPCs (run from repository root) |
+| Unit/integration tests | `uv run --extra dev pytest` | No | Classifier, calibration head, and pipeline state tests (run from `edge/`) |
+| Synthetic-camera runtime | `uv run python -m bin_mpu.main --bin-class paper --fake-camera --no-mcu --mqtt-host localhost` | TFLite interpreter | Exercise the bin pipeline with synthetic frames (run from `edge/`) |
+| Camera runtime | `uv run python -m bin_mpu.main --bin-class paper --mqtt-host localhost` | Camera, MCU, TFLite interpreter | Run the actual bin daemon (run from `edge/`) |
 
-Useful edge environment variables:
-
-```sh
-DEVICE_ID=unoq-01
-MQTT_HOST=localhost
-MQTT_PORT=1883
-MQTT_TOPIC_ROOT=arduino
-FL_GRPC_HOST=localhost
-FL_GRPC_PORT=50051
-EDGE_INPUT_SOURCE=camera        # camera, image, or video
-EDGE_CAMERA_INDEX=0
-EDGE_IMAGE_PATH=
-EDGE_VIDEO_PATH=
-EDGE_MODEL_PATH=models/trash_classifier.tflite
-EDGE_LABELS=cardboard,glass,paper,plastic
-```
+Runtime settings are defined in `edge/bin_mpu/config.py` and exposed through
+`uv run python -m bin_mpu.main --help`. See [edge setup](edge/README.md) for
+interpreter installation, monitoring, and FL configuration. The four-class
+calibration head has 20 weights: set `FL_MODEL_SIZE=20` on the backend when
+enabling FL on real edge clients. The standalone gRPC demo adapts to the server's model size.
 
 ## MQTT Contract
 
@@ -507,24 +510,17 @@ Confirmed edge runtime facts:
 ```mermaid
 flowchart TB
   Edge["edge/ runtime commands"]
-  Sim["No-hardware simulator<br/>uv run python -m app.edge_simulator"]
-  MqttTest["MQTT one-shot test<br/>uv run python scripts/test_mqtt_publish.py"]
-  GrpcTest["gRPC validation<br/>uv run python scripts/test_fl_grpc.py"]
-  ModelLoad["Model load test<br/>uv run python scripts/test_model_load.py"]
-  ImageTest["Single-image inference<br/>EDGE_IMAGE_PATH=... uv run python scripts/test_single_image_inference.py"]
-  Camera["Camera check<br/>uv run python scripts/test_camera_open.py"]
-  Real["Camera/image/video runtime<br/>uv run python -m app.real_edge_runtime"]
+  Sim["No-hardware MQTT demo<br/>mock_mqtt_publisher.py"]
+  GrpcTest["gRPC demo<br/>mock_fl_clients.py"]
+  Tests["Hardware-free tests<br/>uv run --extra dev pytest"]
+  Real["Camera or synthetic frames<br/>python -m bin_mpu.main"]
 
   Edge --> Sim
-  Edge --> MqttTest
   Edge --> GrpcTest
-  Edge --> ModelLoad
-  Edge --> ImageTest
-  Edge --> Camera
+  Edge --> Tests
   Edge --> Real
 
   Sim -->|"publishes status, metrics, classifications, events"| MQTT["TrashUQ MQTT pipeline"]
-  MqttTest --> MQTT
   Real -->|"TFLite material classification telemetry"| MQTT
   GrpcTest --> FL["TrashUQ gRPC FL coordinator"]
 ```
@@ -581,29 +577,33 @@ cd .
 docker compose exec db psql -U trashuq -d dashboard -c "select topic, payload, created_at from mqtt_messages order by created_at desc limit 20;"
 ```
 
-If you copied the current `backend/.env.example`, use its configured credentials instead:
-
-```sh
-docker compose exec db psql -U federated -d dashboard -c "select topic, payload, created_at from mqtt_messages order by created_at desc limit 20;"
-```
+If you use custom credentials, substitute the user configured for the existing PostgreSQL volume.
 
 Edge:
 
 ```sh
 cd edge
-uv run python scripts/test_mqtt_publish.py
-uv run python scripts/test_fl_grpc.py
-uv run python scripts/test_model_load.py
-uv run python -m app.edge_simulator
+uv run --extra dev pytest
+uv run python -m bin_mpu.main --help
 ```
 
 Runtime checks:
 
 ```sh
 cd edge
-uv run python scripts/test_camera_open.py
-EDGE_INPUT_SOURCE=image EDGE_IMAGE_PATH=/path/to/image.jpg uv run python scripts/test_single_image_inference.py
-uv run python -m app.real_edge_runtime
+uv run python -m bin_mpu.main --bin-class paper --mqtt-host localhost
+```
+
+For a hardware-free live demo use the MQTT publisher above. To exercise the real
+inference pipeline, install a TFLite interpreter as described in `edge/README.md`.
+The labeling UI is at `http://localhost:8080`; live monitoring is at `/monitor`.
+
+Web application validation (run in each of `frontend/` and `poster-web/`):
+
+```sh
+npm ci
+npm run typecheck
+npm run build
 ```
 
 ## Evaluation Summary
@@ -618,7 +618,7 @@ The run also demonstrated 0% invalid payloads, 0% dropped messages, median local
 
 Part B evaluates FL scaling through FedAvg simulations with 2, 5, 10 and 20 clients under non-IID data. Final accuracy remained around 93-94%, while communication cost grew with the number of clients.
 
-Confirmed setup from `artifacts/part_b/latest/metadata.json`:
+Reported experiment setup (the runner generates `artifacts/part_b/latest/metadata.json` locally):
 
 - clients: `2`, `5`, `10`, `20`,
 - seeds: `11`, `29`, `47`,
@@ -664,11 +664,11 @@ Beyond raw FedAvg scalability, `experiments/fl_simulation/compare_methods.py` be
 | Port `5432` already allocated | Stop the local PostgreSQL service or set `POSTGRES_PORT` before starting Compose. |
 | Frontend cannot reach backend | Verify `docker compose ps`, `curl http://localhost:4000/health`, and `curl http://localhost:3000/api/dashboard/bootstrap`. |
 | MQTT connection refused | Confirm `trashuq-mqtt` is running and ports `1883`/`9001` are published. |
-| Dashboard does not show device | Run `uv run python scripts/test_mqtt_publish.py`, then inspect `curl http://localhost:4000/api/dashboard/bootstrap`. |
-| DB query auth fails | Use credentials from the active `.env`; defaults are `trashuq`, current example uses `federated`. |
+| Dashboard does not show device | Run the MQTT publisher from the demo above, then inspect `curl http://localhost:4000/api/dashboard/bootstrap`. |
+| DB query auth fails | Defaults and the example use `trashuq`; existing volumes retain their original credentials. |
 | TFLite runtime dependency setup | Install `tflite-runtime` on the edge device or TensorFlow with Lite support on a compatible dev machine. |
-| Camera access | Run `uv run python scripts/test_camera_open.py` and adjust `EDGE_CAMERA_INDEX`. |
-| gRPC connectivity | Confirm backend is running and `localhost:50051` is reachable, then run `uv run python scripts/test_fl_grpc.py`. |
+| Camera access | Adjust `--camera-index` on `bin_mpu.main`, or use `--fake-camera --no-mcu` with an installed interpreter. |
+| gRPC connectivity | Confirm backend is running and `localhost:50051` is reachable, then run the gRPC demo above. |
 
 ## Roadmap
 

@@ -2,7 +2,7 @@
 name = "trashnet"
 version = "0.1.0"
 description = "Smart trash bin with computer vision classification"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.13"
 dependencies = [
     "numpy<2",  # tflite-runtime 2.14 was built against NumPy 1.x; constrain globally to keep resolver consistent
     "opencv-python>=4.9",
@@ -13,8 +13,8 @@ dependencies = [
     "python-multipart>=0.0.9",  # FastAPI requires this for Form/UploadFile endpoints
     "uvicorn>=0.29",
     "websockets>=12.0",  # enables the /monitor live-event WebSocket
-    "grpcio>=1.60",
-    "protobuf>=4.25",
+    "grpcio>=1.80",
+    "protobuf>=6.31.1,<7",
 ]
 
 [project.optional-dependencies]

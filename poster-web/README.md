@@ -5,12 +5,22 @@ Small Next.js landing page for the TrashUQ conference poster. It presents the pr
 ## Run locally
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
 Open `http://localhost:3000`.
 
-## Add the LinkedIn URLs
+## Build and validate
 
-Edit each author's `linkedin` field in `app/links.ts` with their direct profile URL. Until supplied, the card displays “LinkedIn coming soon” instead of sending visitors to a generic LinkedIn page.
+```bash
+npm run typecheck
+npm run build
+npm start -- -p 3001
+```
+
+Use port 3001 when the dashboard already occupies port 3000.
+
+## Project and team links
+
+Repository, paper, and author profile URLs are configured in `app/links.ts`. Each author currently has a direct LinkedIn URL; confirm these links before the presentation.

@@ -3,7 +3,7 @@ export const projectLinks = {
   paper: 'https://github.com/TrashUQ/TrashUQ/blob/main/paper/main.pdf',
 };
 
-// Replace these with the authors' direct LinkedIn profile URLs when available.
+// Authors' direct LinkedIn profile URLs.
 export const people = [
   { name: 'Aleix Bertran Andreu', displayName: 'Bertran Andreu, Aleix', initials: 'AB', photo: '/aleix-bertran.png', linkedin: 'https://www.linkedin.com/in/aleix-bertran-andreu-620591392/' },
   { name: 'Pol Llinàs Vaquer', displayName: 'Llinàs Vaquer, Pol', initials: 'PL', photo: '/pol-llinas.png', linkedin: 'https://www.linkedin.com/in/pol-llinas-vaquer/' },

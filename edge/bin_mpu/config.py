@@ -9,9 +9,6 @@ class Config:
     model_path: Path = Path("models/trash_classifier.tflite")
     db_path: Path = Path("data/samples.db")
     image_dir: Path = Path("data/images")
-    # Keras SavedModel used for on-device fine-tuning (only required if FL enabled)
-    saved_model_path: Path = Path("model/output/saved_model")
-
     # Camera
     camera_index: int = 0
     fake_camera: bool = False  # generate synthetic frames instead of reading V4L2

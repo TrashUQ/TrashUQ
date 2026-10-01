@@ -129,9 +129,8 @@ class SettingSummary:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run Part B FL simulations and generate the report.")
-    parser.add_argument("--dataset-root", default="/home/bpv/Documentos/TrashNet", help="TrashNet-style root with class folders.")
+    parser.add_argument("--dataset-root", default="edge/model/trashnet/data/dataset-resized", help="TrashNet-style root with class folders; synthetic data is used when unavailable.")
     parser.add_argument("--output-dir", default="artifacts/part_b/latest", help="Where to write raw metrics, plots, and report files.")
-    parser.add_argument("--report-template", default="/home/bpv/Documentos/PART_B_FL_Simulation_Report.md")
     parser.add_argument("--client-counts", nargs="+", type=int, default=[2, 5, 10, 20])
     parser.add_argument("--seeds", nargs="+", type=int, default=[11, 29, 47])
     parser.add_argument("--rounds", type=int, default=25)
@@ -143,7 +142,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--optimizer", default="SGD")
     parser.add_argument("--synthetic-samples-per-class", type=int, default=220)
     parser.add_argument("--synthetic-seed", type=int, default=20260517)
-    parser.add_argument("--tester", default=os.environ.get("USER", "bpv"))
+    parser.add_argument("--tester", default=os.environ.get("USER", "unknown"))
     return parser.parse_args()
 
 
@@ -941,7 +940,7 @@ def build_report(
     commands = textwrap.dedent(
         f"""\
         # data prep
-        python3 experiments/part_b/run_part_b.py \\
+        python3 experiments/fl_simulation/run_part_b.py \\
           --dataset-root {args.dataset_root} \\
           --client-counts {' '.join(str(c) for c in args.client_counts)} \\
           --seeds {' '.join(str(s) for s in args.seeds)} \\
@@ -951,13 +950,13 @@ def build_report(
           --learning-rate {args.learning_rate} \\
           --alpha {args.alpha}
         # 2 clients
-        python3 experiments/part_b/run_part_b.py --dataset-root {args.dataset_root} --client-counts 2 --seeds {' '.join(str(s) for s in args.seeds)} --rounds {args.rounds} --local-epochs {args.local_epochs} --batch-size {args.batch_size} --learning-rate {args.learning_rate} --alpha {args.alpha}
+        python3 experiments/fl_simulation/run_part_b.py --dataset-root {args.dataset_root} --client-counts 2 --seeds {' '.join(str(s) for s in args.seeds)} --rounds {args.rounds} --local-epochs {args.local_epochs} --batch-size {args.batch_size} --learning-rate {args.learning_rate} --alpha {args.alpha}
         # 5 clients
-        python3 experiments/part_b/run_part_b.py --dataset-root {args.dataset_root} --client-counts 5 --seeds {' '.join(str(s) for s in args.seeds)} --rounds {args.rounds} --local-epochs {args.local_epochs} --batch-size {args.batch_size} --learning-rate {args.learning_rate} --alpha {args.alpha}
+        python3 experiments/fl_simulation/run_part_b.py --dataset-root {args.dataset_root} --client-counts 5 --seeds {' '.join(str(s) for s in args.seeds)} --rounds {args.rounds} --local-epochs {args.local_epochs} --batch-size {args.batch_size} --learning-rate {args.learning_rate} --alpha {args.alpha}
         # 10 clients
-        python3 experiments/part_b/run_part_b.py --dataset-root {args.dataset_root} --client-counts 10 --seeds {' '.join(str(s) for s in args.seeds)} --rounds {args.rounds} --local-epochs {args.local_epochs} --batch-size {args.batch_size} --learning-rate {args.learning_rate} --alpha {args.alpha}
+        python3 experiments/fl_simulation/run_part_b.py --dataset-root {args.dataset_root} --client-counts 10 --seeds {' '.join(str(s) for s in args.seeds)} --rounds {args.rounds} --local-epochs {args.local_epochs} --batch-size {args.batch_size} --learning-rate {args.learning_rate} --alpha {args.alpha}
         # 20 clients
-        python3 experiments/part_b/run_part_b.py --dataset-root {args.dataset_root} --client-counts 20 --seeds {' '.join(str(s) for s in args.seeds)} --rounds {args.rounds} --local-epochs {args.local_epochs} --batch-size {args.batch_size} --learning-rate {args.learning_rate} --alpha {args.alpha}
+        python3 experiments/fl_simulation/run_part_b.py --dataset-root {args.dataset_root} --client-counts 20 --seeds {' '.join(str(s) for s in args.seeds)} --rounds {args.rounds} --local-epochs {args.local_epochs} --batch-size {args.batch_size} --learning-rate {args.learning_rate} --alpha {args.alpha}
         """
     ).strip()
 

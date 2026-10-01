@@ -16,13 +16,6 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-try:
-    import tflite_runtime.interpreter as tflite
-except ImportError:
-    # Fall back to full TF when running on a dev machine
-    import tensorflow.lite as tflite  # type: ignore[no-reattr]
-
-
 @dataclass
 class Prediction:
     label: str
@@ -39,9 +32,16 @@ class Classifier:
     def __init__(self, model_path: Path, labels: list[str]) -> None:
         if not model_path.exists():
             raise FileNotFoundError(f"TFLite model not found: {model_path}")
+        # Load the interpreter only when constructing a real classifier. CLI help
+        # and tests with fake interpreters do not need TensorFlow installed.
+        try:
+            from tflite_runtime.interpreter import Interpreter
+        except ImportError:
+            from tensorflow.lite import Interpreter
+
         self._labels = labels
         self._n = len(labels)
-        self._interpreter = tflite.Interpreter(model_path=str(model_path))
+        self._interpreter = Interpreter(model_path=str(model_path))
         self._interpreter.allocate_tensors()
 
         input_details = self._interpreter.get_input_details()
